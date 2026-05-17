@@ -1,0 +1,110 @@
+{
+  "skill_name": "openai-agents-fastapi",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "simple-sse-wiring",
+      "prompt": "I built a customer support agent using OpenAI Agents SDK (Python). The agent has a couple of function tools but no MCP, no hosted tools. I want to add a FastAPI server with an SSE streaming endpoint so my React frontend can call it. I don't need session memory right now, just streaming. Show me the minimal code to wire this up.",
+      "expected_output": "A FastAPI app with a /stream SSE endpoint wired to the agent. Should include: async def endpoint, Runner.run_streamed(), StreamingResponse with text/event-stream. Should NOT include MCP integration, Hosted Tools, or Tracing code — those sections are irrelevant to this task.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "has_streaming_response",
+          "description": "Code uses StreamingResponse with media_type text/event-stream",
+          "type": "contains",
+          "value": "text/event-stream"
+        },
+        {
+          "name": "uses_runner_run_streamed",
+          "description": "Code uses Runner.run_streamed() not Runner.run()",
+          "type": "contains",
+          "value": "run_streamed"
+        },
+        {
+          "name": "uses_async_def",
+          "description": "Endpoint is async def, not sync def",
+          "type": "contains",
+          "value": "async def"
+        },
+        {
+          "name": "no_mcp_code",
+          "description": "Output does NOT include MCP integration code (MCPServerStreamableHttp etc) — that's irrelevant to this task",
+          "type": "not_contains",
+          "value": "MCPServerStreamableHttp"
+        },
+        {
+          "name": "no_hosted_tools_code",
+          "description": "Output does NOT include Hosted Tools code (WebSearchTool, FileSearchTool) — that's irrelevant to this task",
+          "type": "not_contains",
+          "value": "WebSearchTool"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "session-memory-redis",
+      "prompt": "I'm building a WhatsApp bot backend with Python. I have an order-taking agent using OpenAI Agents SDK. Different users need separate conversation history, and I'm running multiple server instances so I need Redis-backed session storage. I want FastAPI endpoints with SSE streaming and Redis sessions. How do I wire this up?",
+      "expected_output": "FastAPI app with SSE streaming + Redis session storage. Should include: create_agent_router or equivalent, RedisSession or openai-agents[redis] install, session_id per request. Should NOT include MCP or Tracing or Hosted Tools code.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_redis_sessions",
+          "description": "Response mentions Redis session backend",
+          "type": "contains_any",
+          "value": ["redis", "Redis", "RedisSession"]
+        },
+        {
+          "name": "mentions_session_id",
+          "description": "Response explains session_id usage per request",
+          "type": "contains",
+          "value": "session_id"
+        },
+        {
+          "name": "has_streaming_endpoint",
+          "description": "Response includes streaming endpoint setup",
+          "type": "contains_any",
+          "value": ["stream", "SSE", "StreamingResponse"]
+        },
+        {
+          "name": "no_mcp_code",
+          "description": "Output does NOT include MCP integration code — irrelevant to this task",
+          "type": "not_contains",
+          "value": "MCPServerStreamableHttp"
+        },
+        {
+          "name": "no_hosted_tools_code",
+          "description": "Output does NOT include Hosted Tools code — irrelevant to this task",
+          "type": "not_contains",
+          "value": "WebSearchTool"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "mcp-fastapi-wiring",
+      "prompt": "I have a FastAPI agent backend already running with SSE streaming. Now I want to add an MCP filesystem server (npx @modelcontextprotocol/server-filesystem) to my agent so it can read project files. How do I wire the MCP server into my existing FastAPI+agents setup?",
+      "expected_output": "Code showing MCPServerStdio or MCPServerStreamableHttp wired into the agent, with context manager usage, and how to integrate with the FastAPI lifespan. Should include actual MCP integration code.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "has_mcp_server",
+          "description": "Response includes actual MCP server setup code",
+          "type": "contains_any",
+          "value": ["MCPServerStdio", "MCPServerStreamableHttp", "mcp_servers"]
+        },
+        {
+          "name": "mentions_lifespan_or_context_manager",
+          "description": "Response explains how to manage MCP server lifecycle",
+          "type": "contains_any",
+          "value": ["lifespan", "async with", "context manager"]
+        },
+        {
+          "name": "has_filesystem_example",
+          "description": "Response includes filesystem MCP server example",
+          "type": "contains_any",
+          "value": ["filesystem", "@modelcontextprotocol/server-filesystem", "npx"]
+        }
+      ]
+    }
+  ]
+}
