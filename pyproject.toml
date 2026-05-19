@@ -13,6 +13,7 @@ dependencies = [
     "fastapi[standard]>=0.136.1",
     "geopy>=2.4.1",
     "google-cloud-tasks>=2.22.0",
+    "google-genai>=2.4.0",
     "httpx>=0.28.1",
     "openai-agents>=0.17.2",
     "pytest>=9.0.3",

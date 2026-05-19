@@ -107,7 +107,7 @@ _PROVIDER_MESSAGES = {
             "Kya aap is booking ko confirm karna chahte hain?"
         ),
         "estimate_header": "Ustaad Connect - Estimate Offered",
-        "estimate_footer": "Confirm ya cancel karne ke liye niche diye buttons use karein.",
+        "estimate_footer": "Niche diye gaye buttons se confirm ya cancel karein.",
         "confirm": "Aapki booking {provider_name} ke saath confirm ho gayi hai! Woh aapke {issue_type} ke silsile mein jald hi aap se rabta karenge. Booking ID: #{booking_id}. Agar koi sawal ho to pooch sakte hain!",
         "en_route": "{provider_name} aapki taraf aa rahe hain.",
         "arrived": "{provider_name} aapki location par pahunch chuke hain.",

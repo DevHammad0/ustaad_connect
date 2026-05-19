@@ -54,9 +54,16 @@ class UstaadRedisSession(RedisSession):
         self._session_key = f"{session_id}:counter"
         self._messages_key = session_id
 
-from src.api.agent import ustaad_agent, detect_language
-from src.api.whatsapp import send_whatsapp_message, send_whatsapp_typing_indicator
+from src.api.agent import ustaad_agent, UstaadAgentOutput
+from src.api.whatsapp import (
+    send_whatsapp_message, 
+    send_whatsapp_typing_indicator,
+    download_whatsapp_media,
+    upload_whatsapp_media,
+    send_whatsapp_audio,
+)
 from src.api.geocoding import reverse_geocode_city
+from src.api.audio import transcribe_audio, synthesize_speech
 
 load_dotenv()
 
@@ -180,8 +187,8 @@ async def receive_webhook_worker(request: Request) -> Response:
         logger.error("Failed to parse JSON body in webhook worker")
         return Response(content="Invalid JSON", status_code=400)
 
-    # Process in the background using asyncio.create_task to return 200 OK instantly to Cloud Tasks
-    asyncio.create_task(_process_webhook_body(body))
+    # Await the execution directly to keep the HTTP request active, keeping Cloud Run CPU allocated
+    await _process_webhook_body(body)
     return Response(content="OK", status_code=200)
 
 
@@ -225,6 +232,7 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
         return
 
     user_message = ""
+    user_sent_audio = False
 
     if msg_type == "text":
         user_message = msg.get("text", {}).get("body", "").strip()
@@ -277,33 +285,29 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
             )
             logger.info("GPS coordinates parsed from webhook for %s: lat=%s, lng=%s, city=%s, address=%s", sender, lat, lng, city_label, address_label)
 
+    elif msg_type == "audio":
+        audio_id = msg.get("audio", {}).get("id")
+        if audio_id:
+            logger.info("Downloading audio media %s for %s", audio_id, sender)
+            audio_bytes = await download_whatsapp_media(audio_id)
+            if audio_bytes:
+                logger.info("Transcribing audio for %s", sender)
+                transcribed_text = await transcribe_audio(audio_bytes)
+                if transcribed_text:
+                    user_message = transcribed_text
+                    user_sent_audio = True
+                    logger.info("Audio transcribed successfully: %s", user_message)
+                else:
+                    logger.warning("Audio transcription returned empty text")
+            else:
+                logger.warning("Failed to download audio media %s", audio_id)
+
     if not user_message:
-        logger.info("Ignoring unsupported WhatsApp message type: %s from: %s", msg_type, sender)
+        logger.info("Ignoring unsupported or empty WhatsApp message type: %s from: %s", msg_type, sender)
         return
 
-    # Retrieve or detect language preference
-    lang_pref = None
-    try:
-        lang_pref_bytes = await _redis.get(f"{sender}:lang_pref")
-        if lang_pref_bytes:
-            lang_pref = lang_pref_bytes if isinstance(lang_pref_bytes, str) else lang_pref_bytes.decode("utf-8")
-    except Exception:
-        logger.exception("Failed to fetch language preference from Redis for %s", sender)
-
-    if msg_type == "text":
-        detected_lang = detect_language(user_message)
-        if detected_lang:
-            lang_pref = detected_lang
-            try:
-                await _redis.set(f"{sender}:lang_pref", detected_lang, ex=CONV_TTL)
-            except Exception:
-                logger.exception("Failed to save language preference in Redis for %s", sender)
-
-    if not lang_pref:
-        lang_pref = detect_language(user_message)
-
-    # Dynamically inject customer phone number, message type, and language preference into input
-    system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}, Latest Message Language is {lang_pref}]"
+    # Dynamically inject customer phone number and message type into input
+    system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}]"
     user_message = f"{user_message}\n\n{system_info}"
 
     logger.info("WhatsApp incoming message from %s (%s): %s", sender_name, sender, user_message.replace("\n", " "))
@@ -327,15 +331,43 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
             context={"phone": sender},
         )
 
-        reply = result.final_output or ""
+        agent_output = result.final_output
+        if agent_output and hasattr(agent_output, "send_reply"):
+            send_reply = agent_output.send_reply
+            message_type = agent_output.message_type
+            reply = agent_output.message_to_send
+        else:
+            # Fallback if somehow it's not the Pydantic model (e.g. from mock/test/error)
+            reply = str(agent_output) if agent_output is not None else ""
+            send_reply = bool(reply and reply.strip() and reply.strip() != "__NO_RESPONSE__")
+            message_type = "voice" if (user_sent_audio and len(reply) <= 250) else "text"
 
     except Exception:
         logger.exception("Ustaad Agent processing failure for phone: %s", sender)
         reply = "Sorry, systems mein kuch masla aa gaya hai. Bara-e-maharbani thodi der baad dobara try karein."
+        send_reply = True
+        message_type = "text"
 
     # Dispatch final response back to WhatsApp
-    if reply and reply.strip() and reply.strip() != "__NO_RESPONSE__":
-        await _send_reply(sender, reply)
+    if send_reply and reply and reply.strip():
+        sent_audio = False
+        # If the agent specified voice, attempt to send a voice note
+        if message_type == "voice":
+            logger.info("Attempting to respond with voice note for %s", sender)
+            try:
+                audio_bytes = await synthesize_speech(reply)
+                if audio_bytes:
+                    reply_media_id = await upload_whatsapp_media(audio_bytes, mime_type="audio/ogg")
+                    if reply_media_id:
+                        await send_whatsapp_audio(sender, reply_media_id)
+                        sent_audio = True
+                        logger.info("Successfully sent audio reply to %s. Skipping text reply.", sender)
+            except Exception:
+                logger.exception("Failed to send audio reply to: %s. Will fallback to text.", sender)
+
+        if not sent_audio:
+            logger.info("Sending text response to %s", sender)
+            await _send_reply(sender, reply)
 
 
 async def _send_reply(to_phone: str, text: str) -> None:

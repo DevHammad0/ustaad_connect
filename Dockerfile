@@ -16,6 +16,9 @@ RUN uv sync --frozen --no-dev
 # Stage 2: Runtime
 FROM python:3.13-slim-bookworm AS runtime
 
+# Install system dependencies including ffmpeg for audio conversion
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy the virtual environment from the builder stage

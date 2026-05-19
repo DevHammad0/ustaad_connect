@@ -16,12 +16,13 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import selectinload
+from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel, select
 
 load_dotenv()
 
 DATABASE_URL: str = os.environ["DATABASE_URL"]
-engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
 
 # ---------------------------------------------------------------------------
 # Models imported after engine to avoid circular imports

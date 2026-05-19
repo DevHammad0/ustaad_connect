@@ -74,6 +74,108 @@ async def send_whatsapp_message(to_phone: str, message: str) -> bool:
         return False
 
 
+async def send_whatsapp_audio(to_phone: str, media_id: str) -> bool:
+    """
+    Sends an audio message to a WhatsApp number via the Meta Cloud API.
+
+    Args:
+        to_phone: E.164 format WITHOUT leading +. e.g. "923001234567"
+        media_id: The ID of the uploaded media on Meta's servers.
+
+    Returns:
+        True on HTTP 200, False on any failure.
+    """
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID:
+        return False
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_phone,
+        "type": "audio",
+        "audio": {"id": media_id},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            logger.info("WhatsApp audio sent to %s", to_phone)
+            return True
+    except httpx.HTTPError as exc:
+        logger.error("WhatsApp audio send error for %s: %s", to_phone, exc)
+        return False
+
+
+async def download_whatsapp_media(media_id: str) -> bytes | None:
+    """
+    Downloads media from WhatsApp given a media ID.
+    Requires two steps: 
+    1. Get the media URL.
+    2. Download the binary from the URL.
+    """
+    if not META_WHATSAPP_TOKEN:
+        return None
+
+    # Step 1: Get URL
+    url = f"{META_GRAPH_URL}/{media_id}"
+    headers = {"Authorization": f"Bearer {META_WHATSAPP_TOKEN}"}
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            media_info = response.json()
+            media_url = media_info.get("url")
+            
+            if not media_url:
+                logger.error("Media URL not found in response for media_id: %s", media_id)
+                return None
+
+            # Step 2: Download binary
+            # The URL already contains access tokens, but Meta documentation 
+            # specifies to include the Authorization header for this GET request as well.
+            bin_response = await client.get(media_url, headers=headers)
+            bin_response.raise_for_status()
+            return bin_response.content
+    except httpx.HTTPError as exc:
+        logger.error("Failed to download media %s: %s", media_id, exc)
+        return None
+
+
+async def upload_whatsapp_media(file_bytes: bytes, mime_type: str = "audio/ogg") -> str | None:
+    """
+    Uploads media to WhatsApp and returns the new media ID.
+    """
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID:
+        return None
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/media"
+    headers = {"Authorization": f"Bearer {META_WHATSAPP_TOKEN}"}
+    
+    # We must use multipart/form-data
+    files = {
+        "file": ("audio.ogg", file_bytes, mime_type)
+    }
+    data = {
+        "messaging_product": "whatsapp"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(url, headers=headers, data=data, files=files)
+            response.raise_for_status()
+            result = response.json()
+            return result.get("id")
+    except httpx.HTTPError as exc:
+        logger.error("Failed to upload media: %s", exc)
+        return None
+
+
 async def send_whatsapp_location_request(to_phone: str, body_text: str | None = None) -> bool:
     """
     Sends an interactive location request message to a WhatsApp number.
@@ -101,7 +203,7 @@ async def send_whatsapp_location_request(to_phone: str, body_text: str | None = 
     
     # Predefined static text for all location requests if custom not provided
     if not body_text:
-        body_text = "Apni location share karne ke liye niche diye gaye button par click karein."
+        body_text = "Apni location share krde take me apke liye qareebi providers dhoond sakon"
 
     payload = {
         "messaging_product": "whatsapp",

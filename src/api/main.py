@@ -16,7 +16,47 @@ Run:
 
 from __future__ import annotations
 
+import sys
 import logging
+
+def configure_utf8_logging():
+    """Force standard streams to UTF-8 and configure logging handlers with UTF-8 encoding."""
+    if sys.stdout.encoding != 'utf-8':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except Exception:
+            pass
+    if sys.stderr.encoding != 'utf-8':
+        try:
+            sys.stderr.reconfigure(encoding='utf-8')
+        except Exception:
+            pass
+
+    # Ensure root has handler
+    if not logging.root.handlers:
+        stderr_handler = logging.StreamHandler(sys.stderr)
+        stderr_handler.encoding = "utf-8"
+        stderr_handler.setFormatter(
+            logging.Formatter("%(asctime)s  %(levelname)-8s  %(name)s — %(message)s")
+        )
+        logging.basicConfig(
+            level=logging.INFO,
+            handlers=[stderr_handler],
+        )
+
+    # Force UTF-8 on all existing logger handlers (e.g. uvicorn, httpx, etc.)
+    for logger_name in list(logging.root.manager.loggerDict.keys()):
+        l = logging.getLogger(logger_name)
+        for handler in l.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                handler.encoding = 'utf-8'
+    for handler in logging.root.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.encoding = 'utf-8'
+
+# Run immediately
+configure_utf8_logging()
+
 import traceback
 from contextlib import asynccontextmanager
 
@@ -30,10 +70,6 @@ from src.api.routes.customer import router as customer_router
 from src.api.routes.provider import router as provider_router
 from src.api.routes.webhook import router as webhook_router
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -45,6 +81,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs on startup and shutdown."""
+    configure_utf8_logging()  # Run again to catch any loggers configured by server (e.g., uvicorn)
     logger.info("Starting Ustaad Connect API...")
     await database.init()  # create tables + seed providers
     logger.info("Database ready.")
