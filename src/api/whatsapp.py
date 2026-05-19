@@ -74,13 +74,14 @@ async def send_whatsapp_message(to_phone: str, message: str) -> bool:
         return False
 
 
-async def send_whatsapp_location_request(to_phone: str) -> bool:
+async def send_whatsapp_location_request(to_phone: str, body_text: str | None = None) -> bool:
     """
     Sends an interactive location request message to a WhatsApp number.
     Tapping this will open the user's location picker interface on their mobile device.
 
     Args:
         to_phone: E.164 format WITHOUT leading +. e.g. "923001234567"
+        body_text: Custom text to display above the location button.
 
     Returns:
         True on success, False on failure.
@@ -98,8 +99,9 @@ async def send_whatsapp_location_request(to_phone: str) -> bool:
         "Content-Type": "application/json",
     }
     
-    # Predefined static text for all location requests
-    static_body_text = "Apni location share karne ke liye niche diye gaye button par click karein."
+    # Predefined static text for all location requests if custom not provided
+    if not body_text:
+        body_text = "Apni location share karne ke liye niche diye gaye button par click karein."
 
     payload = {
         "messaging_product": "whatsapp",
@@ -109,7 +111,7 @@ async def send_whatsapp_location_request(to_phone: str) -> bool:
         "interactive": {
             "type": "location_request_message",
             "body": {
-                "text": static_body_text
+                "text": body_text
             },
             "action": {
                 "name": "send_location"
@@ -250,5 +252,68 @@ async def send_whatsapp_typing_indicator(message_id: str) -> bool:
             await client.post(url, headers=headers, json=payload)
             return True
     except Exception:
+        return False
+
+
+async def send_whatsapp_interactive_carousel(
+    to_phone: str,
+    body_text: str,
+    cards: list[dict],
+) -> bool:
+    """
+    Sends an interactive media carousel message to a WhatsApp user.
+    Between 2 and 10 cards must be provided.
+    """
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID:
+        logger.warning(
+            "WhatsApp credentials not configured. "
+            "Set META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID in .env"
+        )
+        return False
+
+    if not cards or len(cards) < 2 or len(cards) > 10:
+        logger.error("Carousel must contain between 2 and 10 cards.")
+        return False
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to_phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "carousel",
+            "body": {
+                "text": body_text
+            },
+            "action": {
+                "cards": cards
+            }
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            logger.info("WhatsApp interactive carousel sent successfully to %s", to_phone)
+            return True
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "WhatsApp Interactive Carousel API returned %s for %s: %s",
+            exc.response.status_code,
+            to_phone,
+            exc.response.text,
+        )
+        return False
+
+    except httpx.HTTPError as exc:
+        logger.error("WhatsApp Interactive Carousel network error for %s: %s", to_phone, exc)
         return False
 

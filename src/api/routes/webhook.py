@@ -54,7 +54,7 @@ class UstaadRedisSession(RedisSession):
         self._session_key = f"{session_id}:counter"
         self._messages_key = session_id
 
-from src.api.agent import ustaad_agent
+from src.api.agent import ustaad_agent, detect_language
 from src.api.whatsapp import send_whatsapp_message, send_whatsapp_typing_indicator
 from src.api.geocoding import reverse_geocode_city
 
@@ -236,7 +236,23 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
         if interactive_type == "list_reply":
             user_message = interactive.get("list_reply", {}).get("title", "")
         elif interactive_type == "button_reply":
-            user_message = interactive.get("button_reply", {}).get("title", "")
+            btn_id = interactive.get("button_reply", {}).get("id", "")
+            btn_title = interactive.get("button_reply", {}).get("title", "")
+            if btn_id.startswith("book_provider_"):
+                provider_id = btn_id.replace("book_provider_", "")
+                user_message = f"I want to book Provider ID: {provider_id}"
+            else:
+                user_message = btn_title
+
+    elif msg_type == "button":
+        button = msg.get("button", {})
+        btn_payload = button.get("payload", "")
+        btn_text = button.get("text", "")
+        if btn_payload.startswith("book_provider_"):
+            provider_id = btn_payload.replace("book_provider_", "")
+            user_message = f"I want to book Provider ID: {provider_id}"
+        else:
+            user_message = btn_payload or btn_text
 
     elif msg_type == "location":
         # Extract native GPS coordinates shared by tapping the button
@@ -265,8 +281,29 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
         logger.info("Ignoring unsupported WhatsApp message type: %s from: %s", msg_type, sender)
         return
 
-    # Dynamically inject customer phone number and message type into input
-    system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}]"
+    # Retrieve or detect language preference
+    lang_pref = None
+    try:
+        lang_pref_bytes = await _redis.get(f"{sender}:lang_pref")
+        if lang_pref_bytes:
+            lang_pref = lang_pref_bytes if isinstance(lang_pref_bytes, str) else lang_pref_bytes.decode("utf-8")
+    except Exception:
+        logger.exception("Failed to fetch language preference from Redis for %s", sender)
+
+    if msg_type == "text":
+        detected_lang = detect_language(user_message)
+        if detected_lang:
+            lang_pref = detected_lang
+            try:
+                await _redis.set(f"{sender}:lang_pref", detected_lang, ex=CONV_TTL)
+            except Exception:
+                logger.exception("Failed to save language preference in Redis for %s", sender)
+
+    if not lang_pref:
+        lang_pref = detect_language(user_message)
+
+    # Dynamically inject customer phone number, message type, and language preference into input
+    system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}, Latest Message Language is {lang_pref}]"
     user_message = f"{user_message}\n\n{system_info}"
 
     logger.info("WhatsApp incoming message from %s (%s): %s", sender_name, sender, user_message.replace("\n", " "))
@@ -290,14 +327,15 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
             context={"phone": sender},
         )
 
-        reply = result.final_output or "Maafi chahta hoon, kuch masla aa gaya. Dobara try karein."
+        reply = result.final_output or ""
 
     except Exception:
         logger.exception("Ustaad Agent processing failure for phone: %s", sender)
         reply = "Sorry, systems mein kuch masla aa gaya hai. Bara-e-maharbani thodi der baad dobara try karein."
 
     # Dispatch final response back to WhatsApp
-    await _send_reply(sender, reply)
+    if reply and reply.strip() and reply.strip() != "__NO_RESPONSE__":
+        await _send_reply(sender, reply)
 
 
 async def _send_reply(to_phone: str, text: str) -> None:

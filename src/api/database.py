@@ -71,24 +71,24 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 SEED_PROVIDERS = [
     # Islamabad
-    dict(name="Ustad Riaz Ahmed",      phone="923011111101", service_type="ac_repair",   city="islamabad",  area="G-13",             lat=33.6938, lng=73.0512, years_experience=12),
-    dict(name="Ustad Khalid Mehmood",  phone="923011111102", service_type="ac_repair",   city="islamabad",  area="E-11",             lat=33.7050, lng=73.0234, years_experience=8),
-    dict(name="Ustad Farooq Ahmad",    phone="923011111103", service_type="plumber",     city="islamabad",  area="F-11",             lat=33.6981, lng=73.0601, years_experience=15),
-    dict(name="Ustad Imtiaz Khan",     phone="923011111104", service_type="electrician", city="islamabad",  area="G-11",             lat=33.7102, lng=73.0389, years_experience=10),
-    dict(name="Ustad Nadeem Akhtar",   phone="923011111105", service_type="plumber",     city="islamabad",  area="F-8",              lat=33.7215, lng=73.0267, years_experience=6),
+    dict(name="Ustad Riaz Ahmed",      phone="923011111101", service_type="ac_repair",   city="islamabad",  area="G-13",             lat=33.6938, lng=73.0512, years_experience=12, profile_pic_url="https://randomuser.me/api/portraits/men/32.jpg"),
+    dict(name="Ustad Khalid Mehmood",  phone="923011111102", service_type="ac_repair",   city="islamabad",  area="E-11",             lat=33.7050, lng=73.0234, years_experience=8,  profile_pic_url="https://randomuser.me/api/portraits/men/44.jpg"),
+    dict(name="Ustad Farooq Ahmad",    phone="923011111103", service_type="plumber",     city="islamabad",  area="F-11",             lat=33.6981, lng=73.0601, years_experience=15, profile_pic_url="https://randomuser.me/api/portraits/men/22.jpg"),
+    dict(name="Ustad Imtiaz Khan",     phone="923011111104", service_type="electrician", city="islamabad",  area="G-11",             lat=33.7102, lng=73.0389, years_experience=10, profile_pic_url="https://randomuser.me/api/portraits/men/11.jpg"),
+    dict(name="Ustad Nadeem Akhtar",   phone="923011111105", service_type="plumber",     city="islamabad",  area="F-8",              lat=33.7215, lng=73.0267, years_experience=6,  profile_pic_url="https://randomuser.me/api/portraits/men/67.jpg"),
     # Lahore
-    dict(name="Ustad Zafar Iqbal",     phone="923021111106", service_type="ac_repair",   city="lahore",     area="DHA Phase 5",      lat=31.5204, lng=74.3587, years_experience=14),
-    dict(name="Ustad Bilal Hussain",   phone="923021111107", service_type="ac_repair",   city="lahore",     area="Gulberg III",      lat=31.5497, lng=74.3436, years_experience=9),
-    dict(name="Ustad Tariq Mahmood",   phone="923021111108", service_type="plumber",     city="lahore",     area="Model Town",       lat=31.5321, lng=74.3290, years_experience=11),
-    dict(name="Ustad Asif Raza",       phone="923021111109", service_type="electrician", city="lahore",     area="Johar Town",       lat=31.4697, lng=74.4078, years_experience=7),
-    dict(name="Ustad Hamid Ali",       phone="923021111110", service_type="plumber",     city="lahore",     area="Bahria Town",      lat=31.4834, lng=74.3251, years_experience=5),
+    dict(name="Ustad Zafar Iqbal",     phone="923021111106", service_type="ac_repair",   city="lahore",     area="DHA Phase 5",      lat=31.5204, lng=74.3587, years_experience=14, profile_pic_url="https://randomuser.me/api/portraits/men/51.jpg"),
+    dict(name="Ustad Bilal Hussain",   phone="923021111107", service_type="ac_repair",   city="lahore",     area="Gulberg III",      lat=31.5497, lng=74.3436, years_experience=9,  profile_pic_url="https://randomuser.me/api/portraits/men/78.jpg"),
+    dict(name="Ustad Tariq Mahmood",   phone="923021111108", service_type="plumber",     city="lahore",     area="Model Town",       lat=31.5321, lng=74.3290, years_experience=11, profile_pic_url="https://randomuser.me/api/portraits/men/29.jpg"),
+    dict(name="Ustad Asif Raza",       phone="923021111109", service_type="electrician", city="lahore",     area="Johar Town",       lat=31.4697, lng=74.4078, years_experience=7,  profile_pic_url="https://randomuser.me/api/portraits/men/33.jpg"),
+    dict(name="Ustad Hamid Ali",       phone="923021111110", service_type="plumber",     city="lahore",     area="Bahria Town",      lat=31.4834, lng=74.3251, years_experience=5,  profile_pic_url="https://randomuser.me/api/portraits/men/41.jpg"),
     # Karachi
-    dict(name="Ustad Saleem Baig",     phone="923211111111", service_type="ac_repair",   city="karachi",    area="Clifton",          lat=24.8607, lng=67.0011, years_experience=16),
-    dict(name="Ustad Jameel Shah",     phone="923211111112", service_type="electrician", city="karachi",    area="Gulshan-e-Iqbal",  lat=24.9056, lng=67.0822, years_experience=10),
-    dict(name="Ustad Waqar Ahmed",     phone="923211111113", service_type="plumber",     city="karachi",    area="PECHS",            lat=24.8772, lng=67.0650, years_experience=8),
+    dict(name="Ustad Saleem Baig",     phone="923211111111", service_type="ac_repair",   city="karachi",    area="Clifton",          lat=24.8607, lng=67.0011, years_experience=16, profile_pic_url="https://randomuser.me/api/portraits/men/15.jpg"),
+    dict(name="Ustad Jameel Shah",     phone="923211111112", service_type="electrician", city="karachi",    area="Gulshan-e-Iqbal",  lat=24.9056, lng=67.0822, years_experience=10, profile_pic_url="https://randomuser.me/api/portraits/men/82.jpg"),
+    dict(name="Ustad Waqar Ahmed",     phone="923211111113", service_type="plumber",     city="karachi",    area="PECHS",            lat=24.8772, lng=67.0650, years_experience=8,  profile_pic_url="https://randomuser.me/api/portraits/men/60.jpg"),
     # Rawalpindi
-    dict(name="Ustad Asghar Butt",     phone="923011111114", service_type="ac_repair",   city="rawalpindi", area="Saddar",           lat=33.5651, lng=73.0169, years_experience=13),
-    dict(name="Ustad Munir Hassan",    phone="923011111115", service_type="electrician", city="rawalpindi", area="Bahria Town Rwp",  lat=33.5984, lng=73.0479, years_experience=9),
+    dict(name="Ustad Asghar Butt",     phone="923011111114", service_type="ac_repair",   city="rawalpindi", area="Saddar",           lat=33.5651, lng=73.0169, years_experience=13, profile_pic_url="https://randomuser.me/api/portraits/men/91.jpg"),
+    dict(name="Ustad Munir Hassan",    phone="923011111115", service_type="electrician", city="rawalpindi", area="Bahria Town Rwp",  lat=33.5984, lng=73.0479, years_experience=9,  profile_pic_url="https://randomuser.me/api/portraits/men/3.jpg"),
 ]
 
 
@@ -171,6 +171,7 @@ async def fetch_available_providers(
             p.total_jobs_done,
             p.is_verified,
             p.visit_fee,
+            p.profile_pic_url,
             (6371 * acos(
                 GREATEST(-1.0, LEAST(1.0,
                     cos(radians(:lat)) * cos(radians(p.lat)) *
@@ -228,6 +229,7 @@ async def fetch_available_providers(
                 is_verified=bool(row["is_verified"]),
                 distance_km=round(float(row["distance_km"]), 2),
                 visit_fee=row["visit_fee"],
+                profile_pic_url=row["profile_pic_url"],
             )
         )
     return cards
@@ -243,6 +245,7 @@ async def create_booking(
     city: str | None,
     service_type: ServiceType,
     idempotency_key: str,
+    language: str = "roman_urdu",
 ) -> Booking:
     """
     Creates a booking with idempotency protection.
@@ -269,6 +272,7 @@ async def create_booking(
             service_type=service_type,
             status=BookingStatus.pending,
             idempotency_key=idempotency_key,
+            language=language,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
@@ -281,10 +285,10 @@ async def create_booking(
     insert_sql = text("""
         INSERT INTO bookings
             (customer_id, provider_id, issue, customer_lat, customer_lng,
-             customer_city, service_type, status, idempotency_key, created_at, updated_at)
+             customer_city, service_type, status, idempotency_key, language, created_at, updated_at)
         VALUES
             (:customer_id, :provider_id, :issue, :lat, :lng,
-             :city, :service_type, 'pending', :idempotency_key, NOW(), NOW())
+             :city, :service_type, 'pending', :idempotency_key, :language, NOW(), NOW())
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id
     """)
@@ -299,6 +303,7 @@ async def create_booking(
             city=city,
             service_type=service_type.value,
             idempotency_key=idempotency_key,
+            language=language,
         ),
     )
     await session.commit()

@@ -49,12 +49,97 @@ from src.api.models import (
     ProviderLoginRequest,
     ProviderLocationUpdateRequest,
     ProviderProfileUpdateRequest,
+    ServiceType,
 )
 from src.api.whatsapp import send_whatsapp_message, send_whatsapp_interactive_buttons
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+_SERVICE_ISSUE_MAP = {
+    "english": {
+        ServiceType.ac_repair: "AC issue",
+        ServiceType.plumber: "plumbing issue",
+        ServiceType.electrician: "electrical issue",
+        ServiceType.handyman: "handyman issue",
+    },
+    "roman_urdu": {
+        ServiceType.ac_repair: "AC masle",
+        ServiceType.plumber: "plumbing masle",
+        ServiceType.electrician: "bijli ke masle",
+        ServiceType.handyman: "handyman masle",
+    },
+    "urdu": {
+        ServiceType.ac_repair: "اے سی کے مسئلے",
+        ServiceType.plumber: "پلمبنگ کے مسئلے",
+        ServiceType.electrician: "بجلی کے مسئلے",
+        ServiceType.handyman: "ہینڈی مین کے مسئلے",
+    }
+}
+
+_PROVIDER_MESSAGES = {
+    "english": {
+        "estimate_body": (
+            "Ustaad {provider_name} has offered the following estimate for your issue:\n\n"
+            "Visit Charge: PKR {visit_fee}\n"
+            "Estimated Repair Cost: PKR {min_cost}-{max_cost}\n\n"
+            "Do you want to confirm this booking?"
+        ),
+        "estimate_header": "Ustaad Connect - Estimate Offered",
+        "estimate_footer": "Use buttons below to confirm or cancel.",
+        "confirm": "Your booking is confirmed with {provider_name}! They will contact you shortly regarding your {issue_type}. Your Booking ID is #{booking_id}. If you have any questions, feel free to ask!",
+        "en_route": "{provider_name} is on the way.",
+        "arrived": "{provider_name} has arrived at your location.",
+        "complete": (
+            "Job completed. {provider_name} resolved your issue.\n"
+            "Final Cost: PKR {final_cost}\n\n"
+            "Please share your rating (1-5 stars) and review in this chat (e.g. \"5 good service\").\n"
+            "Thank you for using Ustaad Connect."
+        ),
+        "cancel": "Ustaad {provider_name} was unable to accept your booking. Please search for another provider on Ustaad Connect.",
+    },
+    "roman_urdu": {
+        "estimate_body": (
+            "Ustaad {provider_name} ne aapke masle ke liye estimate offer kiya hai:\n\n"
+            "Visit Charge: PKR {visit_fee}\n"
+            "Estimated Repair Cost: PKR {min_cost}-{max_cost}\n\n"
+            "Kya aap is booking ko confirm karna chahte hain?"
+        ),
+        "estimate_header": "Ustaad Connect - Estimate Offered",
+        "estimate_footer": "Confirm ya cancel karne ke liye niche diye buttons use karein.",
+        "confirm": "Aapki booking {provider_name} ke saath confirm ho gayi hai! Woh aapke {issue_type} ke silsile mein jald hi aap se rabta karenge. Booking ID: #{booking_id}. Agar koi sawal ho to pooch sakte hain!",
+        "en_route": "{provider_name} aapki taraf aa rahe hain.",
+        "arrived": "{provider_name} aapki location par pahunch chuke hain.",
+        "complete": (
+            "Kaam mukammal ho gaya. {provider_name} ne aapka masla hal kar diya.\n"
+            "Final Cost: PKR {final_cost}\n\n"
+            "Apna feedback aur rating (1-5 stars) isi chat par reply kar ke share karein (e.g. \"5 achi service\").\n"
+            "Shukriya Ustaad Connect use karne ka."
+        ),
+        "cancel": "Ustaad {provider_name} aapki booking accept nahi kar sake. Bara-e-maharbani Ustaad Connect se koi doosra provider book karein.",
+    },
+    "urdu": {
+        "estimate_body": (
+            "استاد {provider_name} نے آپ کے مسئلے کے لیے درج ذیل تخمینہ پیش کیا ہے:\n\n"
+            "وزٹ چارجز: PKR {visit_fee}\n"
+            "تخمینی مرمتی لاگت: PKR {min_cost}-{max_cost}\n\n"
+            "کیا آپ اس بکنگ کی تصدیق کرنا چاہتے ہیں؟"
+        ),
+        "estimate_header": "استاد کنیکٹ - تخمینہ پیش کیا گیا",
+        "estimate_footer": "تصدیق یا منسوخی کے لیے نیچے دیے گئے بٹن استعمال کریں۔",
+        "confirm": "آپ کی بکنگ {provider_name} کے ساتھ تصدیق ہو گئی ہے! وہ آپ کے {issue_type} کے سلسلے میں جلد ہی آپ سے رابطہ کریں گے۔ بکنگ آئی ڈی: #{booking_id}۔ اگر آپ کا کوئی سوال ہے تو بلا جھجھک پوچھیں!",
+        "en_route": "{provider_name} راستے میں ہیں۔",
+        "arrived": "{provider_name} آپ کی لوکیشن پر پہنچ چکے ہیں۔",
+        "complete": (
+            "کام مکمل ہو گیا۔ {provider_name} نے آپ کا مسئلہ حل کر دیا ہے۔\n"
+            "آخری لاگت: PKR {final_cost}\n\n"
+            "براہ کرم اسی چیٹ پر اپنی ریٹنگ (1-5 اسٹارز) اور تبصرہ شیئر کریں (مثال کے طور پر \"5 بہت اچھی سروس\")۔\n"
+            "استاد کنیکٹ استعمال کرنے کا شکریہ۔"
+        ),
+        "cancel": "استاد {provider_name} آپ کی بکنگ قبول نہیں کر سکے۔ براہ کرم استاد کنیکٹ پر کسی دوسرے پرووائیڈر کو تلاش کریں۔",
+    }
+}
 
 APP_SECRET: str = os.environ["APP_SECRET"]
 
@@ -187,13 +272,21 @@ async def accept_booking(
     customer_phone = booking.customer.phone
     visit_fee = booking.provider.visit_fee
 
-    body_text = (
-        f"Aapke plumbing/repairing masle ke liye, Ustaad {provider_name} ne niche diya gaya estimate offer kiya hai:\n\n"
-        f"💵 *Visit Charge:* PKR {visit_fee}\n"
-        f"🔧 *Estimated Repair Cost:* PKR {body.estimated_cost_min}–{body.estimated_cost_max}\n\n"
-        f"Kya aap is booking ko confirm karna chahte hain?"
+    lang = getattr(booking, "language", "roman_urdu") or "roman_urdu"
+    if lang not in _PROVIDER_MESSAGES:
+        lang = "roman_urdu"
+
+    body_template = _PROVIDER_MESSAGES[lang]["estimate_body"]
+    body_text = body_template.format(
+        provider_name=provider_name,
+        visit_fee=visit_fee,
+        min_cost=body.estimated_cost_min,
+        max_cost=body.estimated_cost_max
     )
-    
+
+    header_text = _PROVIDER_MESSAGES[lang]["estimate_header"]
+    footer_text = _PROVIDER_MESSAGES[lang]["estimate_footer"]
+
     buttons = [
         {"id": "confirm_booking", "title": "Confirm Booking"},
         {"id": "cancel_booking", "title": "Cancel Booking"},
@@ -203,8 +296,8 @@ async def accept_booking(
         to_phone=customer_phone,
         body_text=body_text,
         buttons=buttons,
-        header_text="Ustaad Connect — Estimate Offered",
-        footer_text="Niche diye gaye buttons se confirm ya cancel karein."
+        header_text=header_text,
+        footer_text=footer_text
     )
 
     return BookingAcceptResponse(
@@ -249,9 +342,18 @@ async def confirm_booking(
     provider_name = booking.provider.name
     customer_phone = booking.customer.phone
 
-    wa_message = (
-        f"🔧 Booking confirmed! {provider_name} aapke paas aa raha hai.\n"
-        f"Agar koi sawal ho to humse rabta karein."
+    lang = getattr(booking, "language", "roman_urdu") or "roman_urdu"
+    if lang not in _PROVIDER_MESSAGES:
+        lang = "roman_urdu"
+
+    svc_type = booking.service_type
+    issue_type = _SERVICE_ISSUE_MAP[lang].get(svc_type, "issue")
+
+    confirm_template = _PROVIDER_MESSAGES[lang]["confirm"]
+    wa_message = confirm_template.format(
+        provider_name=provider_name,
+        issue_type=issue_type,
+        booking_id=booking_id
     )
     whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
 
@@ -312,7 +414,13 @@ async def advance_booking_status(
 
     provider_name = booking.provider.name
     customer_phone = booking.customer.phone
-    template = _STATUS_MESSAGES.get(body.status, "")
+
+    lang = getattr(booking, "language", "roman_urdu") or "roman_urdu"
+    if lang not in _PROVIDER_MESSAGES:
+        lang = "roman_urdu"
+
+    status_key = body.status.value
+    template = _PROVIDER_MESSAGES[lang].get(status_key, "")
     wa_message = template.format(provider_name=provider_name)
     whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
 
@@ -370,11 +478,14 @@ async def complete_booking(
     customer_phone = booking.customer.phone
     provider_name = provider.name
 
-    wa_message = (
-        f"✅ Kaam mukammal ho gaya! {provider_name} ne aapka masla hal kar diya.\n"
-        f"Final Cost: PKR {body.final_cost}\n\n"
-        f"Apna feedback aur rating (1–5 stars) isi chat par reply kar ke share karein (e.g., \"5 boht achi service\").\n"
-        f"Shukriya Ustaad Connect use karne ka 🙏"
+    lang = getattr(booking, "language", "roman_urdu") or "roman_urdu"
+    if lang not in _PROVIDER_MESSAGES:
+        lang = "roman_urdu"
+
+    complete_template = _PROVIDER_MESSAGES[lang]["complete"]
+    wa_message = complete_template.format(
+        provider_name=provider_name,
+        final_cost=body.final_cost
     )
     whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
 
@@ -431,11 +542,13 @@ async def cancel_booking(
     if body.cancelled_by == CancelledBy.provider:
         provider_name = booking.provider.name
         customer_phone = booking.customer.phone
-        wa_message = (
-            f"❌ Afsos, {provider_name} aapki booking accept nahi kar saka.\n"
-            f"Hum aapko doosra provider dhundh rahe hain. "
-            f"Ustaad Connect se dobara book karein."
-        )
+
+        lang = getattr(booking, "language", "roman_urdu") or "roman_urdu"
+        if lang not in _PROVIDER_MESSAGES:
+            lang = "roman_urdu"
+
+        cancel_template = _PROVIDER_MESSAGES[lang]["cancel"]
+        wa_message = cancel_template.format(provider_name=provider_name)
         whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
 
     return BookingStatusResponse(

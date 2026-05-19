@@ -197,6 +197,9 @@ class Booking(SQLModel, table=True):
     # ── Cancellation ──────────────────────────────────────────────────────
     cancelled_by: CancelledBy | None = Field(default=None)
 
+    # ── Language ──────────────────────────────────────────────────────────
+    language: str = Field(default="roman_urdu", max_length=20)
+
     # ── Rating ────────────────────────────────────────────────────────────
     customer_rating: int | None = Field(default=None, ge=1, le=5)
     # 1–5 stars. Submitted by customer after job completes.
@@ -293,6 +296,7 @@ class ProviderCard(SQLModel):
     is_verified: bool
     distance_km: float  # injected by fetch_available_providers query
     visit_fee: int
+    profile_pic_url: str | None = None
 
 
 class ProviderDetail(ProviderCard):

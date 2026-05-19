@@ -1,0 +1,14 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ustaad-connect:latest
+    container_name: ustaad-connect-web
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    # Optional: mount src for local development hot-reloading
+    # volumes:
+    #   - ./src:/app/src

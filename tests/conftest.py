@@ -184,28 +184,71 @@ from fastapi.testclient import TestClient
 @pytest.fixture(autouse=True)
 def mock_external_apis(monkeypatch):
     # Mock geocoding to prevent Nominatim HTTP requests
-    async def mock_reverse_geocode(lat: float, lng: float) -> str | None:
+    async def mock_reverse_geocode(lat: float, lng: float) -> dict:
         if 33.5 <= lat <= 33.8:
-            return "islamabad"
+            slug = "islamabad"
         elif 31.4 <= lat <= 31.6:
-            return "lahore"
+            slug = "lahore"
         elif 24.8 <= lat <= 25.0:
-            return "karachi"
-        return "islamabad"
+            slug = "karachi"
+        else:
+            slug = "islamabad"
+        return {"slug": slug, "city": slug.title()}
 
     monkeypatch.setattr("src.api.geocoding.reverse_geocode_city", mock_reverse_geocode)
+    try:
+        import src.api.routes.webhook as wh
+        monkeypatch.setattr(wh, "reverse_geocode_city", mock_reverse_geocode)
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import src.api.routes.customer as cust
+        monkeypatch.setattr(cust, "reverse_geocode_city", mock_reverse_geocode)
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import src.api.agent as ag
+        monkeypatch.setattr(ag, "reverse_geocode_city", mock_reverse_geocode)
+    except (ImportError, AttributeError):
+        pass
 
     # Mock WhatsApp message sending to return True instantly
     async def mock_send_whatsapp(to_phone: str, message: str) -> bool:
         return True
 
     monkeypatch.setattr("src.api.whatsapp.send_whatsapp_message", mock_send_whatsapp)
+    try:
+        import src.api.routes.webhook as wh
+        monkeypatch.setattr(wh, "send_whatsapp_message", mock_send_whatsapp)
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import src.api.routes.customer as cust
+        monkeypatch.setattr(cust, "send_whatsapp_message", mock_send_whatsapp)
+    except (ImportError, AttributeError):
+        pass
 
     # Mock WhatsApp location request sending to return True instantly
-    async def mock_send_whatsapp_location_request(to_phone: str) -> bool:
+    async def mock_send_whatsapp_location_request(to_phone: str, body_text: str | None = None) -> bool:
         return True
 
     monkeypatch.setattr("src.api.whatsapp.send_whatsapp_location_request", mock_send_whatsapp_location_request)
+    try:
+        import src.api.routes.customer as cust
+        monkeypatch.setattr(cust, "send_whatsapp_location_request", mock_send_whatsapp_location_request)
+    except (ImportError, AttributeError):
+        pass
+
+    # Mock WhatsApp typing indicator sending to return True instantly
+    async def mock_send_whatsapp_typing_indicator(message_id: str) -> bool:
+        return True
+
+    monkeypatch.setattr("src.api.whatsapp.send_whatsapp_typing_indicator", mock_send_whatsapp_typing_indicator)
+    try:
+        import src.api.routes.webhook as wh
+        monkeypatch.setattr(wh, "send_whatsapp_typing_indicator", mock_send_whatsapp_typing_indicator)
+    except (ImportError, AttributeError):
+        pass
 
     # Patch the module-level _redis singletons so RedisSession never touches real Upstash
     mock_redis_instance = MockRedis()
@@ -225,7 +268,11 @@ def mock_external_apis(monkeypatch):
 # 6. Database session and table setup fixtures
 @pytest.fixture(scope="function")
 def db_setup():
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     
     # Create tables + seed
     async def init_db():

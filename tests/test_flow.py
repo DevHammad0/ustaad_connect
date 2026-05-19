@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from src.api.models import BookingStatus, CancelledBy, Provider, Customer, Booking
-from src.api.database import get_booking_with_relations
+from src.api.database import get_booking_with_relations, engine
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import decorated tools from agent
 from src.api.agent import (
@@ -17,6 +18,7 @@ from src.api.agent import (
     cancel_booking as _cancel_booking_tool,
     request_location as _request_location_tool,
     confirm_booking as _confirm_booking_tool,
+    submit_rating as _submit_rating_tool,
 )
 
 # Helper to unwrap OpenAI Agents SDK FunctionTool into its callable Python core
@@ -37,6 +39,7 @@ check_booking_status = _unwrap_tool(_check_booking_status_tool)
 cancel_booking = _unwrap_tool(_cancel_booking_tool)
 request_location = _unwrap_tool(_request_location_tool)
 confirm_booking = _unwrap_tool(_confirm_booking_tool)
+submit_rating = _unwrap_tool(_submit_rating_tool)
 
 # Mark all tests in this file as async for pytest-asyncio
 pytestmark = pytest.mark.asyncio
@@ -458,8 +461,8 @@ async def test_webhook_incoming_location(db_setup, monkeypatch):
     # Mock Runner.run to verify system prompt prepends coordinate details
     captured_input = []
 
-    async def mock_runner_run(agent, input, session, context):
-        captured_input.append(input)
+    async def mock_runner_run(*args, **kwargs):
+        captured_input.append(kwargs.get("input"))
         class MockResult:
             final_output = "Shukriya! Location mil gayi hai."
         return MockResult()
@@ -510,7 +513,7 @@ async def test_webhook_incoming_location(db_setup, monkeypatch):
     assert response.text == "OK"
 
     # Wait briefly for background asyncio task execution
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.5)
 
     assert len(captured_input) == 1
     assert "Lat: 33.6844" in captured_input[0]
@@ -703,8 +706,8 @@ async def test_webhook_interactive_button_reply(db_setup, monkeypatch):
     """Test 25: Webhook handles button_reply and routes it to agent."""
     captured_input = []
 
-    async def mock_runner_run(agent, input, session, context):
-        captured_input.append(input)
+    async def mock_runner_run(*args, **kwargs):
+        captured_input.append(kwargs.get("input"))
         class MockResult:
             final_output = "Mocked confirm response!"
         return MockResult()
@@ -752,7 +755,7 @@ async def test_webhook_interactive_button_reply(db_setup, monkeypatch):
     assert response.status_code == 200
     assert response.text == "OK"
 
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.5)
     assert len(captured_input) == 1
     assert "Confirm Booking" in captured_input[0]
     assert "Customer Phone is 923038571702" in captured_input[0]
@@ -824,3 +827,284 @@ async def test_accept_booking_interactive_whatsapp_dispatch(client: TestClient, 
     assert len(dispatch["buttons"]) == 2
     assert dispatch["buttons"][0] == {"id": "confirm_booking", "title": "Confirm Booking"}
     assert dispatch["buttons"][1] == {"id": "cancel_booking", "title": "Cancel Booking"}
+
+
+@pytest.mark.asyncio
+async def test_webhook_button_reply(db_setup, monkeypatch):
+    """Test 27: Webhook handles button type (quick replies from templates/carousels) and routes it to agent."""
+    captured_input = []
+
+    async def mock_runner_run(*args, **kwargs):
+        captured_input.append(kwargs.get("input"))
+        class MockResult:
+            final_output = "Mocked book provider response!"
+        return MockResult()
+
+    monkeypatch.setattr("src.api.routes.webhook.Runner.run", mock_runner_run)
+
+    # Webhook payload for button click
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "123456",
+                "changes": [
+                    {
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "contacts": [{"profile": {"name": "Hammad"}, "wa_id": "923038571702"}],
+                            "messages": [
+                                {
+                                    "from": "923038571702",
+                                    "id": "wamid.button123",
+                                    "timestamp": "1715971200",
+                                    "type": "button",
+                                    "button": {
+                                        "payload": "book_provider_5",
+                                        "text": "Book AI Techs"
+                                    }
+                                }
+                            ]
+                        },
+                        "field": "messages"
+                    }
+                ]
+            }
+        ]
+    }
+
+    from httpx import AsyncClient, ASGITransport
+    from src.api.main import app
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/webhook", json=payload)
+    assert response.status_code == 200
+    assert response.text == "OK"
+
+    await asyncio.sleep(0.5)
+    assert len(captured_input) == 1
+    assert "I want to book Provider ID: 5" in captured_input[0]
+    assert "Customer Phone is 923038571702" in captured_input[0]
+
+
+@pytest.mark.asyncio
+async def test_agent_submit_rating_tool(db_setup):
+    """Test 28: Agent tool submit_rating registers the customer rating correctly and handles status checks."""
+    phone = "923001111111"
+    name = "Test Agent Customer"
+
+    # Establish customer and booking
+    cust = await register_customer(phone, name)
+    provs_str = await fetch_available_providers("electrician", 33.6938, 73.0512)
+    prov_id = json.loads(provs_str)[0]["id"]
+    booking_str = await initiate_provider_booking(
+        customer_phone=phone,
+        provider_id=prov_id,
+        issue="Light flickering",
+        lat=33.6938,
+        lng=33.6938,
+        service_type="electrician"
+    )
+    booking_id = json.loads(booking_str)["booking_id"]
+
+    # Try submitting rating for pending booking -> Expect error
+    res_pending_str = await submit_rating(customer_phone=phone, rating=5, review="Great")
+    res_pending = json.loads(res_pending_str)
+    assert "error" in res_pending
+    assert "Only completed bookings can be rated" in res_pending["error"]
+
+    # Transition booking to completed
+    async with AsyncSession(engine) as session:
+        booking = await get_booking_with_relations(session, booking_id)
+        booking.status = BookingStatus.completed
+        session.add(booking)
+        await session.commit()
+
+    # Rate completed booking -> Expect success
+    res_success_str = await submit_rating(customer_phone=phone, rating=4, review="Very nice service")
+    res_success = json.loads(res_success_str)
+    assert res_success["status"] == "success"
+    assert res_success["booking_id"] == booking_id
+    assert "Successfully recorded 4-star rating" in res_success["message"]
+
+    # Verify db status updates
+    async with AsyncSession(engine) as session:
+        booking_db = await session.get(Booking, booking_id)
+        assert booking_db.customer_rating == 4
+        assert booking_db.customer_review == "Very nice service"
+
+        provider_db = await session.get(Provider, prov_id)
+        assert provider_db.rating_total == 4
+        assert provider_db.rating_count == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_language_updates(client: TestClient, monkeypatch, session):
+    """Test 25: Verify WhatsApp updates are dynamic based on booking language, emoji-free, concise and professional."""
+    # Register customer
+    phone = "923038571702"
+    name = "Language Tester"
+    await register_customer(phone, name)
+
+    # 1. Create English booking
+    from src.api.database import create_booking as db_create_booking
+    booking = await db_create_booking(
+        session,
+        customer_id=1,
+        provider_id=1,
+        issue="broken fan",
+        lat=33.6938,
+        lng=73.0512,
+        city="islamabad",
+        service_type="electrician",
+        idempotency_key="idemp-lang-eng"
+    )
+    booking_id = booking.id
+    booking.language = "english"
+    session.add(booking)
+    await session.commit()
+
+    captured_messages = []
+    async def mock_send(to_phone: str, message: str) -> bool:
+        captured_messages.append(message)
+        return True
+
+    async def mock_send_interactive(to_phone: str, body_text: str, buttons: list, header_text: str | None = None, footer_text: str | None = None) -> bool:
+        combined = f"{header_text}\n{body_text}\n{footer_text}"
+        captured_messages.append(combined)
+        return True
+
+    monkeypatch.setattr("src.api.routes.provider.send_whatsapp_message", mock_send)
+    monkeypatch.setattr("src.api.routes.provider.send_whatsapp_interactive_buttons", mock_send_interactive)
+
+    # Accept english booking
+    response = client.post(
+        f"/api/provider/bookings/{booking_id}/accept",
+        headers=HEADERS,
+        json={"estimated_cost_min": 600, "estimated_cost_max": 900}
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 1
+    eng_accept_msg = captured_messages[-1]
+    assert "Ustaad Connect - Estimate Offered" in eng_accept_msg
+    assert "Visit Charge: PKR 500" in eng_accept_msg
+    assert "Estimated Repair Cost: PKR 600-900" in eng_accept_msg
+    assert "confirm" in eng_accept_msg
+    assert "❌" not in eng_accept_msg
+    assert "💵" not in eng_accept_msg
+    assert "🔧" not in eng_accept_msg
+
+    # Confirm english booking
+    response = client.post(
+        f"/api/provider/bookings/{booking_id}/confirm",
+        headers=HEADERS
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 2
+    eng_confirm_msg = captured_messages[-1]
+    assert "Your booking is confirmed with" in eng_confirm_msg
+    assert "electrical issue" in eng_confirm_msg
+    assert f"Booking ID is #{booking_id}" in eng_confirm_msg
+    assert "🔧" not in eng_confirm_msg
+    assert "✅" not in eng_confirm_msg
+
+    # Advance english booking
+    response = client.post(
+        f"/api/provider/bookings/{booking_id}/status",
+        headers=HEADERS,
+        json={"status": "en_route"}
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 3
+    eng_route_msg = captured_messages[-1]
+    assert "is on the way" in eng_route_msg
+    assert "🚗" not in eng_route_msg
+
+    # Arrived english booking
+    response = client.post(
+        f"/api/provider/bookings/{booking_id}/status",
+        headers=HEADERS,
+        json={"status": "arrived"}
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 4
+    eng_arrived_msg = captured_messages[-1]
+    assert "has arrived" in eng_arrived_msg
+    assert "📍" not in eng_arrived_msg
+
+    # Complete english booking
+    response = client.post(
+        f"/api/provider/bookings/{booking_id}/complete",
+        headers=HEADERS,
+        json={"final_cost": 850}
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 5
+    eng_complete_msg = captured_messages[-1]
+    assert "Job completed." in eng_complete_msg
+    assert "Final Cost: PKR 850" in eng_complete_msg
+    assert "✅" not in eng_complete_msg
+
+    # 2. Create Roman Urdu booking
+    booking_ru = await db_create_booking(
+        session,
+        customer_id=1,
+        provider_id=1,
+        issue="broken fan 2",
+        lat=33.6938,
+        lng=73.0512,
+        city="islamabad",
+        service_type="electrician",
+        idempotency_key="idemp-lang-ru"
+    )
+    ru_booking_id = booking_ru.id
+    booking_ru.language = "roman_urdu"
+    session.add(booking_ru)
+    await session.commit()
+
+    # Accept roman urdu booking
+    response = client.post(
+        f"/api/provider/bookings/{ru_booking_id}/accept",
+        headers=HEADERS,
+        json={"estimated_cost_min": 600, "estimated_cost_max": 900}
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 6
+    ru_accept_msg = captured_messages[-1]
+    assert "Ustaad Connect - Estimate Offered" in ru_accept_msg
+    assert "Visit Charge: PKR 500" in ru_accept_msg
+    assert "Estimated Repair Cost: PKR 600-900" in ru_accept_msg
+    assert "confirm" in ru_accept_msg
+    assert "❌" not in ru_accept_msg
+    assert "💵" not in ru_accept_msg
+
+    # Confirm roman urdu booking
+    response = client.post(
+        f"/api/provider/bookings/{ru_booking_id}/confirm",
+        headers=HEADERS
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 7
+    ru_confirm_msg = captured_messages[-1]
+    assert "Aapki booking" in ru_confirm_msg
+    assert "bijli ke masle" in ru_confirm_msg
+    assert f"Booking ID: #{ru_booking_id}" in ru_confirm_msg
+    assert "🔧" not in ru_confirm_msg
+
+    # Complete roman urdu booking
+    # Advance state first
+    client.post(f"/api/provider/bookings/{ru_booking_id}/status", headers=HEADERS, json={"status": "en_route"})
+    client.post(f"/api/provider/bookings/{ru_booking_id}/status", headers=HEADERS, json={"status": "arrived"})
+    response = client.post(
+        f"/api/provider/bookings/{ru_booking_id}/complete",
+        headers=HEADERS,
+        json={"final_cost": 850}
+    )
+    assert response.status_code == 200
+    assert len(captured_messages) == 10
+    ru_complete_msg = captured_messages[-1]
+    assert "Kaam mukammal ho gaya" in ru_complete_msg
+    assert "Final Cost: PKR 850" in ru_complete_msg
+    assert "✅" not in ru_complete_msg
+
+
+
