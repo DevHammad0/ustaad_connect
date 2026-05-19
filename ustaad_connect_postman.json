@@ -1,0 +1,451 @@
+{
+  "info": {
+    "name": "Ustaad Connect API",
+    "description": "Complete collection for Ustaad Connect Customer and Provider Apps. Make sure your server is running on port 8001 (or update the base_url variable).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8001",
+      "type": "string"
+    },
+    {
+      "key": "app_secret",
+      "value": "97361b6101404313c275dd4c6192f825f4de065f5f1e2a3a11b9b13a80ed2e86",
+      "type": "string"
+    },
+    {
+      "key": "provider_id",
+      "value": "61",
+      "type": "string",
+      "description": "ID of the provider (e.g. Khyber AC Techs)"
+    },
+    {
+      "key": "booking_id",
+      "value": "1",
+      "type": "string",
+      "description": "ID of the active booking"
+    }
+  ],
+  "item": [
+    {
+      "name": "Customer Side (WhatsApp & App)",
+      "item": [
+        {
+          "name": "1. Customer Chat (Agent Bridge)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"923038571702\",\n  \"message\": \"I need an AC repair near University Road Peshawar\",\n  \"lat\": 33.9917,\n  \"lng\": 71.4753\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/customer/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "chat"
+              ]
+            },
+            "description": "Body:\n- phone (Required)\n- message (Required)\n- lat (Optional, requires lng)\n- lng (Optional, requires lat)\n- idempotency_key (Optional)"
+          }
+        },
+        {
+          "name": "2. Rate Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"review\": \"Bohat achi service thi ustad ki!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/customer/bookings/{{booking_id}}/rate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "bookings",
+                "{{booking_id}}",
+                "rate"
+              ]
+            },
+            "description": "Body:\n- rating (Required: 1-5)\n- review (Optional)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Provider Side (Mobile App)",
+      "item": [
+        {
+          "name": "1. Login Provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"923000000101\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "login"
+              ]
+            },
+            "description": "Body:\n- phone (Required)"
+          }
+        },
+        {
+          "name": "2. Register Provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New AC Tech\",\n  \"phone\": \"923000000200\",\n  \"service_type\": \"ac_repair\",\n  \"city\": \"peshawar\",\n  \"area\": \"Saddar\",\n  \"visit_fee\": 500,\n  \"years_experience\": 5,\n  \"lat\": 34.0096,\n  \"lng\": 71.5609,\n  \"bio\": \"Professional AC technician with 5 years experience\",\n  \"cnic\": \"17301-5555555-5\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "register"
+              ]
+            },
+            "description": "Body:\n- name (Required)\n- phone (Required)\n- service_type (Required: electrician, plumber, etc.)\n- city (Required)\n- lat (Required)\n- lng (Required)\n- visit_fee (Required)\n- area (Optional)\n- years_experience (Optional)\n- bio (Optional)\n- cnic (Optional)\n- profile_pic_url (Optional)"
+          }
+        },
+        {
+          "name": "3. Get Provider Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/provider/{{provider_id}}/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "{{provider_id}}",
+                "profile"
+              ]
+            },
+            "description": "Path:\n- provider_id (Required)"
+          }
+        },
+        {
+          "name": "4. Get Active Job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/provider/{{provider_id}}/active-job",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "{{provider_id}}",
+                "active-job"
+              ]
+            },
+            "description": "Path:\n- provider_id (Required)"
+          }
+        },
+        {
+          "name": "5. Update Location (Background)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 33.9917,\n  \"lng\": 71.4753\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/{{provider_id}}/location",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "{{provider_id}}",
+                "location"
+              ]
+            },
+            "description": "Body:\n- lat (Required)\n- lng (Required)"
+          }
+        },
+        {
+          "name": "6. Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": true,\n  \"visit_fee\": 600,\n  \"bio\": \"Updated bio here\",\n  \"cnic\": \"17301-5555555-5\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/{{provider_id}}/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "{{provider_id}}",
+                "profile"
+              ]
+            },
+            "description": "Body:\n- is_active (Optional)\n- visit_fee (Optional)\n- bio (Optional)\n- area (Optional)\n- cnic (Optional)"
+          }
+        },
+        {
+          "name": "7. Booking - Accept",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estimated_cost_min\": 2000,\n  \"estimated_cost_max\": 3000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/bookings/{{booking_id}}/accept",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "bookings",
+                "{{booking_id}}",
+                "accept"
+              ]
+            },
+            "description": "Body:\n- estimated_cost_min (Required)\n- estimated_cost_max (Required)"
+          }
+        },
+        {
+          "name": "8. Booking - Confirm/Start",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/provider/bookings/{{booking_id}}/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "bookings",
+                "{{booking_id}}",
+                "confirm"
+              ]
+            },
+            "description": "Body:\n- status (Required: en_route, arrived)"
+          }
+        },
+        {
+          "name": "9. Booking - Status Update (En Route / Arrived)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"en_route\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/bookings/{{booking_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "bookings",
+                "{{booking_id}}",
+                "status"
+              ]
+            },
+            "description": "Body:\n- status (Required: en_route, arrived)"
+          }
+        },
+        {
+          "name": "10. Booking - Complete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"final_cost\": 2500\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/bookings/{{booking_id}}/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "bookings",
+                "{{booking_id}}",
+                "complete"
+              ]
+            },
+            "description": "Body:\n- final_cost (Required)"
+          }
+        },
+        {
+          "name": "11. Booking - Cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-App-Secret",
+                "value": "{{app_secret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelled_by\": \"provider\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/provider/bookings/{{booking_id}}/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "provider",
+                "bookings",
+                "{{booking_id}}",
+                "cancel"
+              ]
+            },
+            "description": "Body:\n- cancelled_by (Required: provider)"
+          }
+        }
+      ]
+    }
+  ]
+}

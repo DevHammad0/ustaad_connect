@@ -1,0 +1,18 @@
+# Ignore git and virtual environment
+.git/
+.gitignore
+.venv/
+__pycache__/
+*.pyc
+
+# Ignore environment variables (must be injected in deployment dashboard)
+.env
+
+# Ignore tests and local scripts
+tests/
+test_*.py
+simulate_*.py
+
+# Ignore agent skills and logs
+.agents/
+scratch/

@@ -1,0 +1,254 @@
+"""
+whatsapp.py — Meta WhatsApp Business Cloud API helper.
+
+Single responsibility: send a freeform text message to a phone number.
+Failures are logged but never raised — a failed notification must never
+break the booking lifecycle.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+
+import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+META_GRAPH_URL = "https://graph.facebook.com/v25.0"
+META_WHATSAPP_TOKEN: str = os.getenv("META_WHATSAPP_TOKEN", "")
+META_PHONE_NUMBER_ID: str = os.getenv("META_PHONE_NUMBER_ID", "")
+
+
+async def send_whatsapp_message(to_phone: str, message: str) -> bool:
+    """
+    Sends a freeform text message to a WhatsApp number via the Meta Cloud API.
+
+    Args:
+        to_phone: E.164 format WITHOUT leading +. e.g. "923001234567"
+        message:  Plain text body to send.
+
+    Returns:
+        True on HTTP 200, False on any failure (logged silently).
+    """
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID:
+        logger.warning(
+            "WhatsApp credentials not configured. "
+            "Set META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID in .env"
+        )
+        return False
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_phone,
+        "type": "text",
+        "text": {"body": message},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            logger.info("WhatsApp message sent to %s", to_phone)
+            return True
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "WhatsApp API returned %s for %s: %s",
+            exc.response.status_code,
+            to_phone,
+            exc.response.text,
+        )
+        return False
+
+    except httpx.HTTPError as exc:
+        logger.error("WhatsApp network error for %s: %s", to_phone, exc)
+        return False
+
+
+async def send_whatsapp_location_request(to_phone: str) -> bool:
+    """
+    Sends an interactive location request message to a WhatsApp number.
+    Tapping this will open the user's location picker interface on their mobile device.
+
+    Args:
+        to_phone: E.164 format WITHOUT leading +. e.g. "923001234567"
+
+    Returns:
+        True on success, False on failure.
+    """
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID:
+        logger.warning(
+            "WhatsApp credentials not configured. "
+            "Set META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID in .env"
+        )
+        return False
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    
+    # Predefined static text for all location requests
+    static_body_text = "Apni location share karne ke liye niche diye gaye button par click karein."
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to_phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            "body": {
+                "text": static_body_text
+            },
+            "action": {
+                "name": "send_location"
+            }
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            logger.info("WhatsApp location request sent to %s", to_phone)
+            return True
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "WhatsApp Location Request API returned %s for %s: %s",
+            exc.response.status_code,
+            to_phone,
+            exc.response.text,
+        )
+        return False
+
+    except httpx.HTTPError as exc:
+        logger.error("WhatsApp Location Request network error for %s: %s", to_phone, exc)
+        return False
+
+
+async def send_whatsapp_interactive_buttons(
+    to_phone: str,
+    body_text: str,
+    buttons: list[dict[str, str]],  # List of {"id": str, "title": str}
+    header_text: str | None = None,
+    footer_text: str | None = None,
+) -> bool:
+    """
+    Sends interactive reply buttons to a WhatsApp user using the exact Meta Cloud API specification.
+    Maximum of 3 buttons allowed.
+    """
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID:
+        logger.warning(
+            "WhatsApp credentials not configured. "
+            "Set META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID in .env"
+        )
+        return False
+
+    if not buttons or len(buttons) > 3:
+        logger.error("Interactive reply buttons must contain between 1 and 3 items.")
+        return False
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    # Construct standard Meta Cloud API interactive buttons payload
+    interactive_payload: dict = {
+        "type": "button",
+        "body": {
+            "text": body_text
+        },
+        "action": {
+            "buttons": [
+                {
+                    "type": "reply",
+                    "reply": {
+                        "id": btn["id"],
+                        "title": btn["title"]
+                    }
+                }
+                for btn in buttons
+            ]
+        }
+    }
+
+    if header_text:
+        interactive_payload["header"] = {
+            "type": "text",
+            "text": header_text
+        }
+
+    if footer_text:
+        interactive_payload["footer"] = {
+            "text": footer_text
+        }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to_phone,
+        "type": "interactive",
+        "interactive": interactive_payload
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            logger.info("WhatsApp interactive buttons sent successfully to %s", to_phone)
+            return True
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "WhatsApp Interactive Buttons API returned %s for %s: %s",
+            exc.response.status_code,
+            to_phone,
+            exc.response.text,
+        )
+        return False
+
+    except httpx.HTTPError as exc:
+        logger.error("WhatsApp Interactive Buttons network error for %s: %s", to_phone, exc)
+        return False
+
+
+async def send_whatsapp_typing_indicator(message_id: str) -> bool:
+    """Sends a 'typing...' indicator in response to a user message."""
+    if not META_WHATSAPP_TOKEN or not META_PHONE_NUMBER_ID or not message_id:
+        return False
+
+    url = f"{META_GRAPH_URL}/{META_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "status": "read",
+        "message_id": message_id,
+        "typing_indicator": {
+            "type": "text"
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(url, headers=headers, json=payload)
+            return True
+    except Exception:
+        return False
+

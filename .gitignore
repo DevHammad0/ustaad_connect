@@ -10,3 +10,19 @@ wheels/
 .venv
 .env
 .env.local
+cloud_run_env.yaml
+
+# Local Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Agent scratch & platform folders
+scratch/
+.agents/
+
+# Editor & IDE configs
+.vscode/
+.idea/
+.DS_Store
+

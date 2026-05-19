@@ -7,7 +7,22 @@ authors = [
     { name = "Hammad", email = "devhammad.m@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "asyncpg>=0.31.0",
+    "fastapi[standard]>=0.136.1",
+    "geopy>=2.4.1",
+    "google-cloud-tasks>=2.22.0",
+    "httpx>=0.28.1",
+    "openai-agents>=0.17.2",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "python-dotenv>=1.2.2",
+    "redis>=7.4.0",
+    "sqlmodel>=0.0.38",
+    "upstash-redis>=1.7.0",
+    "uvicorn>=0.47.0",
+]
 
 [project.scripts]
 ustaad-connect = "ustaad_connect:main"
@@ -15,3 +30,6 @@ ustaad-connect = "ustaad_connect:main"
 [build-system]
 requires = ["uv_build>=0.11.14,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.fastapi]
+entrypoint = "src.api.main:app"
