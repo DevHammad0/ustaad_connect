@@ -25,4 +25,4 @@ scratch/
 .vscode/
 .idea/
 .DS_Store
-
+provider_mobile_app/*
