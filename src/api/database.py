@@ -157,7 +157,7 @@ async def fetch_available_providers(
     1. If city is provided → city-scoped query first.
     2. If city is None OR city-scoped result is empty → distance-only fallback.
     """
-    active_statuses = ("pending", "accepted", "confirmed", "en_route", "arrived")
+    active_statuses = ("accepted", "confirmed", "en_route", "arrived")
     placeholders = ", ".join(f"'{s}'" for s in active_statuses)
 
     base_select = f"""

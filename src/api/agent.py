@@ -31,19 +31,8 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Configure default client for Agents SDK (using Gemini's OpenAI-compatible endpoint)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-if GEMINI_API_KEY:
-    gemini_openai_client = AsyncOpenAI(
-        api_key=GEMINI_API_KEY.strip(),
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-    )
-    set_default_openai_client(client=gemini_openai_client, use_for_tracing=False)
-    set_default_openai_api("chat_completions")
-    set_tracing_disabled(disabled=True)
-    logger.info("Configured Agents SDK default client to use Gemini via OpenAI-compatible endpoint.")
-else:
-    logger.warning("GEMINI_API_KEY/GOOGLE_API_KEY not found. Falling back to default OpenAI client config.")
+# The standard OpenAI client is automatically configured by the Agents SDK using the OPENAI_API_KEY environment variable.
+
 
 
 
@@ -925,7 +914,7 @@ async def submit_rating(customer_phone: str, rating: int, review: str | None = N
 
 ustaad_agent = Agent(
     name="Ustaad Agent",
-    model="gemini-3.1-flash-lite",
+    model="gpt-4o-mini",
     instructions=USTAAD_INSTRUCTIONS,
     output_type=UstaadAgentOutput,
     tools=[
