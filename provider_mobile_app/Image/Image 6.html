@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00a884",
+                        "wa-bg": "#0b141a",
+                        "wa-header": "#1f2c34",
+                        "wa-surface": "#202c33",
+                        "wa-text-primary": "#e9edef",
+                        "wa-text-secondary": "#8696a0",
+                        "background-light": "#f5f8f8",
+                        "background-dark": "#0b141a",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"],
+                        "body": ["Public Sans", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #0b141a;
+            color: #e9edef;
+            font-family: 'Public Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .wa-card {
+            background: #202c33;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #00a884 !important;
+            box-shadow: 0 0 0 1px #00a884;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b141a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374045;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-24">
+<!-- TopAppBar -->
+<nav class="w-full top-0 sticky z-50 bg-wa-header flex items-center justify-between px-5 py-4 shadow-md">
+<div class="flex items-center gap-4">
+<button class="text-wa-text-primary active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="text-xl font-semibold text-wa-text-primary">Profile Settings</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-wa-text-secondary hover:text-wa-text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button class="p-2 text-wa-text-secondary hover:text-wa-text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</nav>
+<main class="max-w-2xl mx-auto px-5 pt-8 space-y-8">
+<!-- Profile Header -->
+<section class="flex flex-col items-center">
+<div class="relative group cursor-pointer">
+<div class="w-36 h-36 rounded-full border-none overflow-hidden shadow-2xl transition-transform group-hover:scale-105 duration-300">
+<img alt="Profile Picture" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiVufiiAV7JiHCvrMmHlqtTEf21XXI9cfYA7tZeLtQfDmjDYw_CSwryr--Spj5zHlxC7D6laDQbuB5V8lSunLLgvWNhC1MvRoypY5IfhsHWPYvgO1HbzAhAoRFNCPbwHGVIWmhBQqaa67ocXGZW6aEPvTSShqZ8XrtrSrjV-mTK-Xd33wWKobjbV2ZZc4JsTogSj1fQVHH7ARuTozmimLbVd_YABuuH3c0DidNgPBqLUF9Petevg4t_TXCp1-VzePbPP5RgsuSQHGv"/>
+</div>
+<div class="absolute bottom-1 right-1 bg-primary p-2.5 rounded-full shadow-lg text-white border-4 border-wa-bg">
+<span class="material-symbols-outlined text-[22px]" data-icon="photo_camera" style="font-variation-settings: 'FILL' 1">photo_camera</span>
+</div>
+</div>
+<p class="mt-4 text-sm font-medium text-wa-text-secondary">Tap to update photo</p>
+</section>
+<!-- Theme Switcher -->
+<section class="wa-card rounded-xl overflow-hidden divide-y divide-wa-bg/50">
+<div class="flex items-center justify-between p-4">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-wa-text-secondary" data-icon="dark_mode">dark_mode</span>
+<div>
+<p class="text-wa-text-primary font-medium">Dark Theme</p>
+<p class="text-wa-text-secondary text-sm">System default</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-[#374045] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-wa-text-secondary peer-checked:after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</section>
+<!-- Personal Info -->
+<section class="space-y-4">
+<h2 class="text-primary font-semibold flex items-center gap-2 px-1">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+                Personal Info
+            </h2>
+<div class="wa-card rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1">
+<label class="text-[11px] font-bold text-wa-text-secondary uppercase tracking-wider">Full Name</label>
+<p class="text-base text-wa-text-primary">Ustaad Ahmed Khan</p>
+</div>
+<div class="space-y-1">
+<label class="text-[11px] font-bold text-wa-text-secondary uppercase tracking-wider">Phone Number</label>
+<p class="text-base text-wa-text-primary">+92 300 1234567</p>
+</div>
+<div class="space-y-1">
+<label class="text-[11px] font-bold text-wa-text-secondary uppercase tracking-wider">CNIC</label>
+<p class="text-base text-wa-text-primary">42101-*******-1</p>
+</div>
+<div class="space-y-1">
+<label class="text-[11px] font-bold text-wa-text-secondary uppercase tracking-wider">Service Type</label>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="electrical_services">electrical_services</span>
+<p class="text-base text-wa-text-primary">Electrician</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Professional Details (Editable) -->
+<section class="space-y-4">
+<h2 class="text-primary font-semibold flex items-center gap-2 px-1">
+<span class="material-symbols-outlined" data-icon="business_center">business_center</span>
+                Professional Details
+            </h2>
+<div class="space-y-5">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+<div class="space-y-1.5">
+<label class="text-sm text-wa-text-secondary ml-1">Visit Fee (PKR)</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-wa-text-secondary font-medium">Rs.</span>
+<input class="w-full bg-wa-surface border-none rounded-xl py-3.5 pl-12 pr-4 text-wa-text-primary placeholder-wa-text-secondary transition-all shadow-sm" type="number" value="1500"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="text-sm text-wa-text-secondary ml-1">Years of Experience</label>
+<input class="w-full bg-wa-surface border-none rounded-xl py-3.5 px-4 text-wa-text-primary transition-all shadow-sm" type="number" value="8"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="text-sm text-wa-text-secondary ml-1">Bio</label>
+<textarea class="w-full bg-wa-surface border-none rounded-xl py-3.5 px-4 text-wa-text-primary transition-all resize-none shadow-sm h-32" placeholder="Describe your skills and services...">Certified electrician with 8+ years of experience in residential and commercial wiring, solar panel installation, and appliance repair. Dedicated to safety and high-quality workmanship.</textarea>
+</div>
+</div>
+</section>
+<!-- Location Section -->
+<section class="space-y-4">
+<h2 class="text-primary font-semibold flex items-center gap-2 px-1">
+<span class="material-symbols-outlined" data-icon="location_on">location_on</span>
+                Location
+            </h2>
+<div class="rounded-xl overflow-hidden wa-card">
+<div class="h-56 w-full relative">
+<img alt="Dark Location Map" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0uiBgvqBt3_r2Vgx2neQGzxenbWx76obAn8vMuM-Gb3FuLNoqq45vfqBMN6BLXHg4b9YVLWli5G3jtpypyJiSQB-MB1FT6spkfilsPgOJIbZ6meHNCrZdVklkrHH371EYLFjFvN4XdtvXPO2j5tV2A_JuRZoENUMEyT8BlefuwjE_bdXt_ZAOd04C7gWBO4nbR-QCQSxOudULSz26SeM0pbNjf6JkCdkvPOm07nehbSy5XldKl-VyKeHxSXD"/>
+<div class="absolute inset-0 bg-gradient-to-t from-wa-bg/40 to-transparent"></div>
+</div>
+<div class="p-5 flex flex-col items-center">
+<p class="text-sm text-wa-text-secondary mb-5">DHA Phase 6, Karachi, Pakistan</p>
+<button class="flex items-center gap-2 text-primary font-semibold bg-primary/10 px-6 py-2.5 rounded-full transition-all active:scale-95">
+<span class="material-symbols-outlined text-[20px]" data-icon="near_me">near_me</span>
+                        Update Base Location
+                    </button>
+</div>
+</div>
+</section>
+<!-- Final Actions -->
+<div class="pt-6 space-y-4">
+<button class="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="save">save</span>
+                Save Profile Changes
+            </button>
+<button class="w-full border border-[#ea0038]/30 text-[#ea0038] font-semibold py-4 rounded-xl hover:bg-[#ea0038]/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                Logout
+            </button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 bg-wa-header border-t border-wa-surface shadow-2xl flex justify-around items-center h-20 md:hidden">
+<a class="flex flex-col items-center justify-center text-wa-text-secondary px-6 py-2 group" href="#">
+<span class="material-symbols-outlined mb-1 group-active:scale-90 transition-transform" data-icon="home">home</span>
+<span class="text-[12px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-wa-text-secondary px-6 py-2 group" href="#">
+<span class="material-symbols-outlined mb-1 group-active:scale-90 transition-transform" data-icon="work">work</span>
+<span class="text-[12px] font-medium">Jobs</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary px-6 py-2 group relative" href="#">
+<div class="absolute -top-1 w-12 h-1 bg-primary rounded-b-lg"></div>
+<span class="material-symbols-outlined mb-1 group-active:scale-90 transition-transform" data-icon="person" style="font-variation-settings: 'FILL' 1">person</span>
+<span class="text-[12px] font-bold">Profile</span>
+</a>
+</nav>
+<script>
+        // Micro-interactions for WhatsApp feel
+        const inputs = document.querySelectorAll('input, textarea');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                input.closest('.relative')?.classList.add('wa-active-ring');
+            });
+            input.addEventListener('blur', () => {
+                input.closest('.relative')?.classList.remove('wa-active-ring');
+            });
+        });
+    </script>
+</body></html>

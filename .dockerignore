@@ -16,3 +16,6 @@ simulate_*.py
 # Ignore agent skills and logs
 .agents/
 scratch/
+
+# Ignore mobile app
+provider_mobile_app/

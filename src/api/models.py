@@ -398,9 +398,14 @@ class ProviderLocationUpdateRequest(SQLModel):
 
 
 class ProviderProfileUpdateRequest(SQLModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    phone: str | None = Field(default=None, min_length=10, max_length=15)
+    service_type: ServiceType | None = None
+    city: str | None = Field(default=None, min_length=2, max_length=50)
     is_active: bool | None = None
     bio: str | None = None
     visit_fee: int | None = None
     area: str | None = None
     cnic: str | None = Field(default=None, max_length=15)
+    years_experience: int | None = Field(default=None, ge=0, le=50)
 

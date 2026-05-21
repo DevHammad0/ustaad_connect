@@ -783,6 +783,14 @@ async def update_provider_profile(
             detail=f"Provider with ID #{provider_id} not found."
         )
 
+    if body.name is not None:
+        provider.name = body.name
+    if body.phone is not None:
+        provider.phone = body.phone
+    if body.service_type is not None:
+        provider.service_type = body.service_type
+    if body.city is not None:
+        provider.city = body.city
     if body.is_active is not None:
         provider.is_active = body.is_active
     if body.bio is not None:
@@ -793,6 +801,8 @@ async def update_provider_profile(
         provider.area = body.area
     if body.cnic is not None:
         provider.cnic = body.cnic
+    if body.years_experience is not None:
+        provider.years_experience = body.years_experience
 
     session.add(provider)
     await session.commit()
