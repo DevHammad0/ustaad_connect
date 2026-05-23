@@ -92,19 +92,25 @@ class MockRedis:
     def __init__(self, *args, **kwargs):
         pass
 
-    # ---- sync helpers (used by geocoding.py) ----
-    def get(self, key: str):
+    # ---- async helpers (used by geocoding.py) ----
+    async def get(self, key: str):
         val = self._store.get(key)
         if isinstance(val, list):
             return None  # Lists are not plain string keys
         return val
 
-    def set(self, key: str, value, ex=None):
+    async def set(self, key: str, value, ex=None, nx=False):
+        if nx and key in self._store:
+            return None
         self._store[key] = value
         return True
 
     @classmethod
     def from_env(cls, **_):
+        return cls()
+
+    @classmethod
+    def from_url(cls, *args, **kwargs):
         return cls()
 
     # ---- async helpers (used by RedisSession) ----
@@ -145,10 +151,8 @@ class MockRedis:
         return _MockPipeline(self._store)
 
 
-import upstash_redis
-import upstash_redis.asyncio as _upstash_async
-upstash_redis.Redis = MockRedis
-_upstash_async.Redis = MockRedis  # covers `from upstash_redis.asyncio import Redis`
+import redis.asyncio as redis_async
+redis_async.Redis = MockRedis
 
 # 3. Create async SQLite engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession

@@ -17,31 +17,7 @@ from agents.extensions.memory import RedisSession
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from upstash_redis.asyncio import Redis as UpstashRedis
-
-
-# ---------------------------------------------------------------------------
-# Upstash → redis-py pipeline compatibility adapter
-# ---------------------------------------------------------------------------
-
-class _CompatiblePipeline:
-    """Wraps an Upstash AsyncPipeline to expose the redis-py `.execute()` API."""
-
-    def __init__(self, pipe) -> None:
-        self._pipe = pipe
-
-    def __getattr__(self, name: str):
-        return getattr(self._pipe, name)
-
-    async def execute(self) -> list:
-        return await self._pipe.exec()
-
-
-class _CompatibleRedis(UpstashRedis):
-    """Upstash async Redis client whose `.pipeline()` returns a redis-py-compatible wrapper."""
-
-    def pipeline(self):
-        return _CompatiblePipeline(super().pipeline())
+from redis.asyncio import Redis
 
 
 class UstaadRedisSession(RedisSession):
@@ -49,11 +25,21 @@ class UstaadRedisSession(RedisSession):
 
     def __init__(self, session_id: str, *args, **kwargs) -> None:
         super().__init__(session_id, *args, **kwargs)
-        # The Agents SDK uses `_session_key` for its internal INCR message counter
-        # and `_messages_key` for the actual List of messages.
-        # We swap them here so the exact phone number is the List of messages.
-        self._session_key = f"{session_id}:counter"
-        self._messages_key = session_id
+        # Group everything for this user under user:{phone_number}:
+        self._messages_key = f"user:{session_id}:messages"
+        self._session_key = f"user:{session_id}:counter"
+
+    async def _serialize_item(self, item) -> str:
+        """Override serialization to place 'role' or 'type' first for better Redis console scanning."""
+        ordered = {}
+        if "role" in item:
+            ordered["role"] = item["role"]
+        if "type" in item:
+            ordered["type"] = item["type"]
+        for k, v in item.items():
+            if k not in ordered:
+                ordered[k] = v
+        return await super()._serialize_item(ordered)
 
 from src.api.agent import ustaad_agent
 from src.api.database import get_session, get_booking_with_relations, submit_rating
@@ -73,8 +59,19 @@ logger = logging.getLogger(__name__)
 
 APP_SECRET: str = os.environ["APP_SECRET"]
 
-# Async Upstash Redis client — full conversation history stored via RedisSession
-_redis = _CompatibleRedis.from_env()
+def _get_redis_url() -> str:
+    url = os.getenv("UPSTASH_REDIS_URL")
+    if url:
+        return url
+    rest_url = os.getenv("UPSTASH_REDIS_REST_URL", "")
+    token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+    if rest_url and token:
+        host = rest_url.replace("https://", "").replace("http://", "")
+        return f"rediss://default:{token}@{host}:6379"
+    return "redis://localhost:6379"
+
+# Async Redis client — full conversation history stored via RedisSession
+_redis = Redis.from_url(_get_redis_url(), decode_responses=True)
 CONV_TTL = 10800  # 3 hours
 
 router = APIRouter(prefix="/api/customer", tags=["customer"])

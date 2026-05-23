@@ -55,11 +55,20 @@ CITY_SLUG_MAP: dict[str, str] = {
 
 def _get_redis_client():
     """Lazy Redis client — only imported/created if Upstash configuration is available."""
-    if not UPSTASH_REDIS_REST_URL:
+    url = os.getenv("UPSTASH_REDIS_URL")
+    rest_url = os.getenv("UPSTASH_REDIS_REST_URL")
+    if not url and not rest_url:
         return None
     try:
-        from upstash_redis import Redis
-        return Redis.from_env()
+        from redis.asyncio import Redis
+        redis_url = url
+        if not redis_url and rest_url:
+            token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+            host = rest_url.replace("https://", "").replace("http://", "")
+            redis_url = f"rediss://default:{token}@{host}:6379"
+        if not redis_url:
+            return None
+        return Redis.from_url(redis_url, decode_responses=True)
     except Exception as exc:
         logger.warning("Could not connect to Redis for geocode cache: %s", exc)
         return None
@@ -77,7 +86,7 @@ async def reverse_geocode_city(lat: float, lng: float) -> dict[str, str | None]:
     redis = _get_redis_client()
     if redis:
         try:
-            cached = redis.get(cache_key)
+            cached = await redis.get(cache_key)
             if cached is not None:
                 logger.debug("Geocache v2 hit for %s,%s", lat, lng)
                 return json.loads(cached)
@@ -115,7 +124,7 @@ async def reverse_geocode_city(lat: float, lng: float) -> dict[str, str | None]:
     # --- Cache write ---
     if redis:
         try:
-            redis.set(cache_key, json.dumps(result), ex=GEOCACHE_TTL)
+            await redis.set(cache_key, json.dumps(result), ex=GEOCACHE_TTL)
         except Exception as exc:
             logger.warning("Redis geocache write failed: %s", exc)
 

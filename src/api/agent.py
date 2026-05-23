@@ -21,6 +21,7 @@ from agents import (
     set_default_openai_api,
     set_tracing_disabled,
 )
+from agents.model_settings import ModelSettings
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
@@ -48,68 +49,6 @@ class UstaadAgentOutput(BaseModel):
     )
 
 
-# ---------------------------------------------------------------------------
-# Language Detection Helper Constants and Function
-# ---------------------------------------------------------------------------
-
-ROMAN_URDU_WORDS = {
-    "hai", "hain", "ko", "ke", "ki", "ka", "se", "main", "mein", "kar", "raha", "rahi", "ho", "gaya", "gayi", 
-    "aur", "bhi", "tum", "aap", "aapki", "aapka", "aapke", "apni", "apna", "apne", "karein", "karo", "karna", 
-    "krna", "kr", "par", "pe", "tha", "thi", "the", "nhi", "nahi", "na", "to", "toh", "hi", "he", "ye", "yeh", 
-    "wo", "woh", "kuch", "kya", "kyun", "kab", "kahan", "kaise", "ek", "do", "teen", "chaar", "paanch", 
-    "saal", "rabta", "masla", "masle", "silsile", "shukriya", "meharbani", "madad", "chahiye", "chaheye", 
-    "krdo", "kardo", "kijiye", "kijeye", "karta", "karte", "karne", "niche", "diye", "gaye", "kare", "karon", 
-    "mila", "mili", "mile", "paas", "nazdeek", "qareeb", "tashreef", "lana", "dhund", "dhoond", "dhoondo", 
-    "dhundo", "masail", "theek", "thik", "karwana", "karwa", "karna", "krwana", "chala", "chal", "rha", "rhi",
-    "bhej", "bhejo", "bhejein", "kya", "kiya", "kia"
-}
-
-ENGLISH_WORDS = {
-    "the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with", "he", 
-    "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her", "she", "or", 
-    "an", "will", "my", "one", "all", "would", "there", "their", "what", "so", "up", "out", "if", "about", 
-    "who", "get", "which", "go", "me", "when", "make", "can", "like", "time", "no", "just", "him", "know", 
-    "take", "people", "into", "year", "your", "good", "some", "could", "them", "see", "other", "than", "then", 
-    "now", "look", "only", "come", "its", "over", "think", "also", "back", "after", "use", "two", "how", 
-    "our", "work", "first", "well", "way", "even", "new", "want", "any", "these", "give", "day", "most", 
-    "us", "cooling", "repair", "plumber", "electrician", "broken", "fan", "leak", "water", "issue", "find", 
-    "ustaad", "ustad", "hello", "hi", "hey", "please", "help", "thanks", "thank", "rate", "stars", "star", 
-    "location", "share", "send", "book", "confirm", "cancel", "status", "where", "how", "much"
-}
-
-import re
-
-def detect_language(text: str) -> str:
-    """
-    Detects if the text is in Urdu script, Roman Urdu, or English.
-    Returns: 'urdu', 'roman_urdu', or 'english'.
-    """
-    if not text:
-        return "english"
-    
-    # 1. Check for Urdu/Arabic script characters
-    if re.search(r"[\u0600-\u06FF]", text):
-        return "urdu"
-        
-    text_lower = text.lower()
-    
-    # 2. Strip SYSTEM / System Info blocks to prevent biasing
-    cleaned_text = re.sub(r"\[.*?\]", "", text_lower).strip()
-    if not cleaned_text:
-        return "english"
-        
-    words = re.findall(r"\b[a-z']+\b", cleaned_text)
-    if not words:
-        return "english"
-        
-    roman_count = sum(1 for w in words if w in ROMAN_URDU_WORDS)
-    english_count = sum(1 for w in words if w in ENGLISH_WORDS)
-    
-    if roman_count > 0 and roman_count >= english_count * 0.4:
-        return "roman_urdu"
-    else:
-        return "english"
-
 
 # ---------------------------------------------------------------------------
 # Status labels — used by check_booking_status to compose natural language
@@ -126,10 +65,25 @@ STATUS_LABELS: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Agent instructions (System Prompt)
-# ---------------------------------------------------------------------------
-
 USTAAD_INSTRUCTIONS = """
+# CRITICAL SAFETY & TURN TRANSITION RULES (NEVER VIOLATE)
+1. NO TOOL CHAINING FOR PRIMARY FLOWS:
+   - The primary flow tools are: `request_location`, `fetch_available_providers`, `initiate_provider_booking`, `confirm_booking`, and `submit_rating`.
+   - You MUST NOT call more than one of these primary tools on the same turn (i.e. within the same user message processing loop).
+   - Once any of these primary tools is called and executes, you must stop immediately and return your final response/reply structure. You are strictly forbidden from calling any other tool on that same turn.
+2. IMMEDIATE STOP WHEN PRIMARY TOOL EXECUTES:
+   - When a primary tool output is the most recent event in the conversation history (i.e. it has just been executed in the current run), you must stop and return:
+     * For `request_location`: Set `send_reply = False`, `message_to_send = ""`.
+     * For `fetch_available_providers`: Set `send_reply = False`, `message_to_send = ""`.
+     * For `initiate_provider_booking`: Set `send_reply = True`, and `message_to_send` to the booking confirmation message. Do NOT call `confirm_booking` or `submit_rating`.
+     * For `confirm_booking`, `cancel_booking`, or `submit_rating`: Set `send_reply = True`, and `message_to_send` to the confirmation/thank you message.
+3. CONVERSATION TURN TRANSITIONS:
+   - The stop rules only apply to the current turn where the tool is called. On subsequent turns (when a new message is received from the user), you must proceed to the next step of the flow:
+     * Turn 1 (Intake): Call `check_customer_exists`/`register_customer`, then call `request_location` and STOP.
+     * Turn 2 (Location Shared): After the user sends coordinates, call `fetch_available_providers` once and STOP. Do NOT call `fetch_available_providers` multiple times, and do NOT call it if it has already been called for these coordinates.
+     * Turn 3 (Booking Selection): After the user selects a provider, map their choice to the provider ID from the `providers_sent` field of the previous `fetch_available_providers` tool output, call `initiate_provider_booking` once and STOP.
+     * Subsequent Turns: Only call `confirm_booking`, `cancel_booking`, or `submit_rating` if the user's latest message explicitly requests it. Never call them automatically.
+
 # ROLE & CORE MISSION
 You are Ustaad Connect, a highly professional Pakistani home-services booking assistant.
 Your goal is to assist customers with booking services (AC repair, plumbing, electrical) in Pakistan (Islamabad, Rawalpindi, Peshawar, Lahore, Karachi, etc.).
@@ -141,19 +95,56 @@ Your goal is to assist customers with booking services (AC repair, plumbing, ele
 - Voice Reply Formatting: If you are replying via voice (i.e. `message_type` is `"voice"`), your response MUST be clean and pronounceable: NO emojis, NO markdown (do not use asterisks `*` or underscores `_`), NO URLs, and NO newlines. Keep it extremely short (MAX 2-3 conversational sentences).
 
 # LANGUAGE ENFORCEMENT & PREFERENCE
-- You must automatically detect the language and script used by the customer in their latest message (English, Roman Urdu, or Urdu script).
-- You MUST reply entirely in that same language and script to match the customer's choice:
-  - If the customer writes or speaks in English -> Respond entirely in English. If they sent a voice note, respond in spoken English (setting `message_type` to `"voice"`).
-  - If the customer writes in Roman Urdu -> Respond entirely in Roman Urdu text (setting `message_type` to `"text"`).
-  - If the customer writes in Urdu script -> Respond entirely in Urdu script text (setting `message_type` to `"text"`).
-  - SPECIAL RULE FOR VOICE NOTES: If the customer sends an audio message (indicated by `Message Type is audio` in the `[System Info]` block) and spoke in Urdu or Roman Urdu, you MUST reply in Roman Urdu voice (setting `message_type` to `"voice"` and writing `message_to_send` in Roman Urdu).
-- CRITICAL: If the customer switches languages/scripts on the current turn, you MUST immediately switch your response language to match.
-- When calling tool functions, pass the detected language of the latest turn to tools that accept a language parameter (e.g. pass `"english"`, `"roman_urdu"`, or `"urdu"` to `fetch_available_providers` and `initiate_provider_booking`).
-- TOOL PARAMETERS MATCHING: When calling tools (such as `initiate_provider_booking` and `submit_rating`), any free-text parameters like `issue` or `review` MUST match the customer's detected language and script preference:
-  - For English: Write the parameters entirely in English.
-  - For Roman Urdu: Write the parameters entirely in Roman Urdu (e.g., write `issue` as `"AC ka masla"` instead of Urdu script `"اے سی کا مسئلہ"`, write `review` as `"Kafi achi service"`).
-  - For Urdu script: Write the parameters entirely in Urdu script (e.g., `"اے سی کا مسئلہ"`, `"بہت اچھی سروس"`).
-- NO DEVANAGARI/HINDI SCRIPT: Under no circumstances should you ever write, output, or pass Hindi/Devanagari script characters (e.g. `काफी अच्छी`) in your response text, voice messages, or tool arguments (like `review` or `issue`). If the user message is transcribed with Hindi/Devanagari characters, you must translate/transcribe it into Roman Urdu, Urdu script, or English according to the context before using it in any tool arguments or replies.
+
+## Language Detection — Use Context and Linguistic Understanding
+
+Customers in Pakistan frequently **code-switch** (mix Pashto and Urdu in the same sentence), especially in voice messages. The transcription of Pashto audio may appear as Arabic-script text that looks similar to Urdu but contains Pashto words and grammatical patterns.
+
+**Rule 1 — System-generated messages: ALWAYS inherit language from history.**
+The following message types are generated by the system, NOT typed or spoken by the customer. Their text content is always in English regardless of the customer's actual language. You MUST ignore their text for language detection and instead use the language from the customer's most recent spoken/typed message in the conversation history:
+- `Message Type is button` — e.g. `[BOOKING_SELECTION: provider_id=61]`
+- `Message Type is interactive` — e.g. a button-reply or list-reply
+- `Message Type is location` — the location pin with GPS coordinates
+
+**Rule 2 — For audio messages, understand the language semantically.**
+Do NOT rely on matching a fixed list of Pashto marker words. Use your knowledge of Pashto as a language:
+- Pashto has distinct grammar, vocabulary, and verb forms that differ from Urdu even when both are written in Arabic script.
+- Speakers who mix Pashto and Urdu are still Pashto speakers — treat their session as Pashto.
+- Examples of Pashto mixed with Urdu that should be detected as Pashto:
+  - "السلام علیکم اے سی خراب تھے، صحیح طرح کولنگ نہ کئی، نو لک استاد و غیرہ اوگرئی را تا" → **Pashto** (contains Pashto verbs: نو، لک، اوگرئی، را تا)
+  - "یار دا پہلے نے خیبر اسی ٹیکر آلا بوک" → **Pashto** (contains Pashto words: دا، آلا)
+  - "بھائی جان، زما اے سی خراب دے" → **Pashto** (زما، دے are Pashto)
+
+**Rule 3 — Maintain language throughout the session.**
+Once you identify a customer as a Pashto speaker, treat all subsequent turns as Pashto unless they clearly and explicitly switch to a different language. A short message, a location pin, or a button tap does not constitute a language switch.
+
+**Rule 4 — Classification:**
+- Audio or text containing Pashto words, verb endings, or grammar (even mixed with Urdu) → `pashto`
+- Pure Urdu script with no Pashto patterns → `urdu`
+- Roman/Latin script, casual Roman Urdu → `roman_urdu`
+- English → `english`
+
+## Response Language Rules
+Reply entirely in the detected or inherited language:
+- **English** → English text or voice.
+- **Roman Urdu** → Roman Urdu text.
+- **Urdu** → Urdu script text.
+- **Pashto** → Pashto script for text; spoken Pashto (script or Roman Pashto) for voice replies.
+- **VOICE NOTE RULE**: If the user sent audio (`Message Type is audio`), always set `message_type = "voice"`, regardless of language.
+
+## Tool Language Parameter
+Pass the detected/inherited language to all tools that accept a `language` parameter (`fetch_available_providers`, `initiate_provider_booking`, etc.): `"english"`, `"roman_urdu"`, `"urdu"`, or `"pashto"`.
+
+## Tool Free-text Parameters
+Write free-text arguments (`issue`, `review`, etc.) in the detected language:
+- English: `"AC is not cooling"`
+- Roman Urdu: `"AC ka masla hai"`
+- Urdu: `"اے سی کا مسئلہ"`
+- Pashto: `"د اے سی خرابوالی"` or `"زما اے سی خراب دے"`
+
+## NO Hindi/Devanagari Script
+Never output or pass Devanagari characters (e.g. `काफی`). Convert them to Roman Urdu, Urdu script, or English first.
+
 
 # SYSTEM INFO & PHONE EXTRACTION
 - On every turn, a system info block is appended to the user message:
@@ -182,7 +173,7 @@ You must return a structured response conforming to the `UstaadAgentOutput` mode
 ## 1. CUSTOMER IDENTIFICATION & REGISTRATION (Mandatory First Step)
 - Every conversation start must begin by calling `check_customer_exists(phone)`.
 - If the customer is found:
-  - Greet them by name in the specified language (e.g., English: "Hello Hammad! How can I help you today?"; Roman Urdu: "Assalam-o-Alaikum, Hammad! Kya haal hai? Kaise help kar sakta hoon?").
+  - Greet them by name in the specified language (e.g., English: "Hello Hammad! How can I help you today?"; Roman Urdu: "Assalam-o-Alaikum, Hammad! Kya haal hai? Kaise help kar sakta hoon?"; Pashto: "سلام حماد! څنګه درسره مرسته کولای شم؟").
 - If not found:
   - Prompt the customer for their name only in their language.
   - Once they provide their name, call `register_customer(phone, name)`.
@@ -197,28 +188,42 @@ You must return a structured response conforming to the `UstaadAgentOutput` mode
 - If the customer's request is ambiguous or you cannot determine which category it fits, ask the customer for clarification before calling the provider search tool.
 - Confirm the category slug using `get_service_categories()`.
 - Send the interactive WhatsApp Location picker by calling `request_location(phone, body_text)`.
-  - The `body_text` parameter MUST be translated to the target language (e.g., English: "Please share your location to find a nearby provider.", Roman Urdu: "Apni location share krde take me apke liye qareebi providers dhoond sakon", Urdu: "اپنے قریبی پرووائیڈرز تلاش کرنے کے لیے اپنی لوکیشن شیئر کریں۔").
+  - The `body_text` parameter MUST be translated to the target language:
+    - English: "Please share your location to find a nearby provider."
+    - Roman Urdu: "Apni location share krde take me apke liye qareebi providers dhoond sakon"
+    - Urdu: "اپنے قریبی پرووائیڈرز تلاش کرنے کے لیے اپنی لوکیشن شیئر کریں۔"
+    - Pashto (Arabic script): "مهرباني وکړئ خپل ځای (location) شریک کړئ ترڅو زه تاسو ته نږدې خدمت کونکي پیدا کړم۔"
+    - Pashto (Arabic script, colloquial/simple): "مهرباني وکړه خپل لوکېشن شریک کړه چې زه درته نږدې د خدمت والا خلک پیدا کړم۔"
+    - Pashto (Roman script): "Mehrabani okra khpal location share kra che za darta nezhde khidmat wala khalaq paida kram."
   - If the tool call is successful, you MUST set `send_reply` to `False` and `message_to_send` to `""`.
 
 ## 3. PROVIDER SEARCH & CAROUSEL
 - Once coordinates are received via the system message (which includes the `Full Address` and `City Database Filter`):
-  - Read the `Full Address` and identify/reason the city name (e.g. "peshawar", "islamabad", "lahore").
-  - Call `fetch_available_providers(customer_phone=phone, service_type=service_type, lat=lat, lng=lng, city=city, language=language)`.
-  - The tool will automatically send the carousel or selection cards directly to WhatsApp.
-  - DO NOT output the list of providers in text.
-  - DO NOT ask the customer to manually select.
-  - If the tool successfully sends the carousel/buttons, you MUST set `send_reply` to `False` and `message_to_send` to `""`.
+  - If you see in the conversation history that `fetch_available_providers` has already been called and returned success, you are FORBIDDEN from calling it again or calling `initiate_provider_booking` or any other tools. Immediately stop and return: `send_reply = False`, `message_to_send = ""`.
+  - Only if `fetch_available_providers` has NOT yet been called for these coordinates in the conversation history, you should:
+    1. Read the `Full Address` and identify/reason the city name (e.g. "peshawar", "islamabad", "lahore").
+    2. Call `fetch_available_providers(customer_phone=phone, service_type=service_type, lat=lat, lng=lng, city=city, language=language)`.
+    3. The tool will automatically send the carousel or selection cards directly to WhatsApp.
+  - DO NOT output the list of providers in your text response.
+  - DO NOT write a text message asking the customer to select, because the interactive WhatsApp carousel/buttons are already sent. You MUST wait for the customer's next message (where they tap 'Book' or type their choice).
 
 ## 4. PROVIDER BOOKING & INITIAL CONFIRMATION
-- When the customer taps "Book", the webhook translates it to: `"I want to book Provider ID: <id>"`.
-- Extract the provider ID and call `initiate_provider_booking(customer_phone=phone, provider_id=id, issue=issue, lat=lat, lng=lng, service_type=service, city=city, language=language)`.
+- When the customer taps "Book" (button/interactive) or states/spells they want to book a specific provider (via text or audio):
+  - If you see in the conversation history that `initiate_provider_booking` has already been called and returned success, you are FORBIDDEN from calling it again. Immediately stop and return the booking confirmation message below.
+  - Only if `initiate_provider_booking` has NOT yet been called for this user request in the conversation history, you should:
+    1. **If the message contains `[BOOKING_SELECTION: provider_id=<id>]`** (generated when the customer taps the Book button): extract the numeric provider ID directly from this tag. Do NOT look it up in `providers_sent` — the ID is already correct.
+    2. **If the message is spoken/typed** (text or audio): map the customer's selected provider name to its ID by looking up `"providers_sent"` from the preceding `fetch_available_providers` output. Never guess or hallucinate the ID.
+    3. Call `initiate_provider_booking(customer_phone=phone, provider_id=id, issue=issue, lat=lat, lng=lng, service_type=service, city=city, language=language)`.
+  - CRITICAL: DO NOT call `confirm_booking` or `check_booking_status` or any other tool on this turn after calling `initiate_provider_booking`.
+  - Set `send_reply` to `True` and return the confirmation message below directly to the customer as your response.
 - Send a dynamic, customized booking confirmation without any emojis. Use the exact layout below:
   - English: "Your booking is confirmed with <Provider Name>! They will contact you shortly regarding your <service_type> issue. Your Booking ID is #<booking_id>. If you have any questions, feel free to ask!"
   - Roman Urdu: "Aapki booking <Provider Name> ke sath confirm ho gayi hai! Woh aapke <service_type> ke masle ke silsile mein jald hi aap se rabta karenge. Aapki Booking ID #<booking_id> hai. Agar koi sawal ho to pooch sakte hain!"
+  - Pashto: "ستاسو بکینګ د <Provider Name> سره تایید شو! دوی به ستاسو د <service_type> ستونزې په اړه ژر له تاسو سره اړیکه ونیسي. ستاسو د بکینګ ID #<booking_id> دی. که کومه پوښتنه لرئ، وړیا احساس وکړئ پوښتنه وکړئ!"
 
 ## 5. BOOKING CONFIRMATION & CANCELLATION ACTIONS
-- When a provider accepts the booking and offers an estimate, the customer receives interactive buttons to confirm or cancel.
-- If the customer says they want to confirm or clicks the confirm button, immediately call `confirm_booking(customer_phone=phone)`.
+- DO NOT call `confirm_booking` when a booking is initially created. The initial booking created by `initiate_provider_booking` is in "pending" status and cannot be confirmed yet.
+- Only call `confirm_booking(customer_phone=phone)` later when a provider has accepted the job and offered an estimate, and the customer explicitly says they want to confirm or clicks the confirm button.
 - If the customer cancels, call `cancel_booking(customer_phone=phone)`.
 
 ## 6. PROVIDER TRACKING & STATUS CHECKS
@@ -322,6 +327,8 @@ async def request_location(phone: str, body_text: str | None = None) -> str:
     This opens the native GPS location picker on their WhatsApp app.
     Call this tool whenever you need to get the customer's coordinates to find nearby providers.
 
+    CRITICAL SAFETY RULE: Immediately after calling this tool, you MUST STOP execution and return a response with send_reply=False and message_to_send="". Do NOT call fetch_available_providers or any other tool on the same turn.
+
     Args:
         phone: Customer's E.164 phone number without leading +. e.g. "923038571702"
         body_text: Optional message/prompt to show on the location request card (e.g. "Please share your location to find a provider." in the customer's language, concise and max 1 short line).
@@ -340,7 +347,7 @@ async def request_location(phone: str, body_text: str | None = None) -> str:
     return json.dumps({
         "success": success,
         "action": "request_location",
-        "message": "Location request sent successfully via WhatsApp." if success else "Failed to send location request."
+        "message": "Location request sent successfully via WhatsApp. You MUST now STOP execution immediately for the current turn. DO NOT call fetch_available_providers or any other tool. Set send_reply = False and message_to_send = ''." if success else "Failed to send location request."
     })
 
 
@@ -356,6 +363,8 @@ async def fetch_available_providers(
     """
     Finds available providers near the customer's location for the given service.
     If customer_phone is provided, it automatically sends them as an interactive WhatsApp media carousel (or buttons).
+
+    CRITICAL SAFETY RULE: Immediately after calling this tool, you MUST STOP execution and return a response with send_reply=False and message_to_send="". Do NOT call initiate_provider_booking or any other tool on the same turn.
 
     Args:
         customer_phone: Customer's E.164 phone number without leading +.
@@ -426,6 +435,16 @@ async def fetch_available_providers(
         one_provider_header = "ہمیں آپ کے علاقے میں 1 پرووائیڈر ملا ہے:\n\n"
         one_provider_footer = "کیا آپ انہیں بک کرنا چاہتے ہیں؟"
         carousel_body = "آپ کی لوکیشن کے قریب دستیاب پرووائیڈرز:"
+    elif lang == "pashto":
+        no_providers_msg = "بښنه غواړم، په دې وخت کې ستاسو په سیمه کې هیڅ خدمت کونکی آنلاین نشته. مهرباني وکړئ لږ وروسته بیا هڅه وکړئ."
+        one_provider_header = "ما ستاسو په سیمه کې ۱ خدمت کونکی پیدا کړ:\n\n"
+        one_provider_footer = "ایا تاسو غواړئ دوی بک کړئ؟"
+        carousel_body = "ستاسو ځای ته نږدې شتون لرونکي خدمت کونکي:"
+    elif lang == "roman_pashto":
+        no_providers_msg = "Bakhshana ghwaram, pa de wakht ke staso pa seema ke hech khidmat wala online nashta. Mehrabani okra lag rawrosta bia koshish kra."
+        one_provider_header = "Ma staso pa seema ke 1 khidmat wala paida kr:\n\n"
+        one_provider_footer = "Aya tase ghwaray da book kray?"
+        carousel_body = "Staso location ta nezhde available khidmat wala khalaq:"
     else:  # roman_urdu
         no_providers_msg = "Maafi chahta hoon, is waqt aapke area mein koi provider online nahi hai. Bara-e-maharbani thodi der baad dobara koshish karein."
         one_provider_header = "Hamein aapke area mein 1 provider mila hai:\n\n"
@@ -469,6 +488,28 @@ async def fetch_available_providers(
                 f"💳 وزٹ فیس: PKR {provider.visit_fee}\n\n"
                 f"{one_provider_footer}"
             )
+        elif lang == "pashto":
+            body_text = (
+                f"{one_provider_header}"
+                f"👤 *{provider.name}*\n"
+                f"📍 سیمه: {provider.area or 'N/A'}\n"
+                f"🚗 فاصله: {provider.distance_km} کیلومتره\n"
+                f"💼 تجربه: {provider.years_experience} کاله\n"
+                f"⭐ درجه: {rating_str}\n"
+                f"💳 د لیدنې فیس: PKR {provider.visit_fee}\n\n"
+                f"{one_provider_footer}"
+            )
+        elif lang == "roman_pashto":
+            body_text = (
+                f"{one_provider_header}"
+                f"👤 *{provider.name}*\n"
+                f"📍 Seema: {provider.area or 'N/A'}\n"
+                f"🚗 Distance: {provider.distance_km} km\n"
+                f"💼 Experience: {provider.years_experience} kaal\n"
+                f"⭐ Rating: {rating_str}\n"
+                f"💳 Diagnostic Visit Fee: PKR {provider.visit_fee}\n\n"
+                f"{one_provider_footer}"
+            )
         else:
             body_text = (
                 f"{one_provider_header}"
@@ -498,8 +539,16 @@ async def fetch_available_providers(
         return json.dumps({
             "status": "success",
             "provider_count": 1,
-            "message": "Only 1 provider found. Sent interactive buttons to the customer.",
-            "whatsapp_sent": success
+            "message": "Only 1 provider found. Sent interactive buttons to the customer. You MUST now STOP execution immediately for the current turn. DO NOT call initiate_provider_booking or any other tool. Set send_reply = False and message_to_send = ''.",
+            "whatsapp_sent": success,
+            "providers_sent": [
+                {
+                    "id": provider.id,
+                    "name": provider.name,
+                    "service_type": provider.service_type.value,
+                    "visit_fee": provider.visit_fee
+                }
+            ]
         })
 
     # If 2 or more providers found, send interactive media carousel
@@ -530,6 +579,22 @@ async def fetch_available_providers(
             )
             if provider.area:
                 card_body = f"علاقہ: {provider.area}\n" + card_body
+        elif lang == "pashto":
+            card_body = (
+                f"فاصله: {provider.distance_km} کیلومتره | درجه: {rating_str}\n"
+                f"تجربه: {provider.years_experience} کاله | کارونه: {provider.total_jobs_done}\n"
+                f"د لیدنې فیس: PKR {provider.visit_fee}"
+            )
+            if provider.area:
+                card_body = f"سیمه: {provider.area}\n" + card_body
+        elif lang == "roman_pashto":
+            card_body = (
+                f"Distance: {provider.distance_km} km | Rating: {rating_str}\n"
+                f"Experience: {provider.years_experience} kaal | Jobs: {provider.total_jobs_done}\n"
+                f"Visit Fee: PKR {provider.visit_fee}"
+            )
+            if provider.area:
+                card_body = f"Seema: {provider.area}\n" + card_body
         else:
             card_body = (
                 f"Distance: {provider.distance_km} km | Rating: {rating_str}\n"
@@ -580,8 +645,17 @@ async def fetch_available_providers(
     return json.dumps({
         "status": "success",
         "provider_count": len(cards),
-        "message": "Sent interactive media carousel to the customer.",
-        "whatsapp_sent": success
+        "message": "Sent interactive media carousel to the customer. You MUST now STOP execution immediately for the current turn. DO NOT call initiate_provider_booking or any other tool. Set send_reply = False and message_to_send = ''.",
+        "whatsapp_sent": success,
+        "providers_sent": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "service_type": c.service_type.value,
+                "visit_fee": c.visit_fee
+            }
+            for c in cards
+        ]
     })
 
 
@@ -917,6 +991,10 @@ ustaad_agent = Agent(
     model="gpt-4o-mini",
     instructions=USTAAD_INSTRUCTIONS,
     output_type=UstaadAgentOutput,
+    # Disable parallel tool calls: forces one tool call per inference step,
+    # preventing the model from duplicating fetch_available_providers or
+    # initiate_provider_booking within the same turn.
+    model_settings=ModelSettings(parallel_tool_calls=False),
     tools=[
         get_service_categories,
         check_customer_exists,

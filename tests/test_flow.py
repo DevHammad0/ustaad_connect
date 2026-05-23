@@ -882,7 +882,7 @@ async def test_webhook_button_reply(db_setup, monkeypatch):
 
     await asyncio.sleep(0.5)
     assert len(captured_input) == 1
-    assert "I want to book Provider ID: 5" in captured_input[0]
+    assert "[BOOKING_SELECTION: provider_id=5]" in captured_input[0]
     assert "Customer Phone is 923038571702" in captured_input[0]
 
 

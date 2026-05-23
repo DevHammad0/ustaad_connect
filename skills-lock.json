@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "prompt-engineering-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/llm-application-dev/skills/prompt-engineering-patterns/SKILL.md",
+      "computedHash": "02098f8a63f10c8700df6c042346c170a121cd54905d8009f13528bad8eb8e53"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

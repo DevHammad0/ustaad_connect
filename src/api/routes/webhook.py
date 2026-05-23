@@ -18,32 +18,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Query, Request, Response
 from agents import Runner
 from agents.extensions.memory import RedisSession
-from upstash_redis.asyncio import Redis as UpstashRedis
-
-
-# ---------------------------------------------------------------------------
-# Upstash → redis-py pipeline compatibility adapter
-# RedisSession calls `await pipe.execute()` but Upstash uses `await pipe.exec()`
-# ---------------------------------------------------------------------------
-
-class _CompatiblePipeline:
-    """Wraps an Upstash AsyncPipeline to expose the redis-py `.execute()` API."""
-
-    def __init__(self, pipe) -> None:
-        self._pipe = pipe
-
-    def __getattr__(self, name: str):
-        return getattr(self._pipe, name)
-
-    async def execute(self) -> list:
-        return await self._pipe.exec()
-
-
-class _CompatibleRedis(UpstashRedis):
-    """Upstash async Redis client whose `.pipeline()` returns a redis-py-compatible wrapper."""
-
-    def pipeline(self):
-        return _CompatiblePipeline(super().pipeline())
+from redis.asyncio import Redis
 
 
 class UstaadRedisSession(RedisSession):
@@ -51,8 +26,20 @@ class UstaadRedisSession(RedisSession):
 
     def __init__(self, session_id: str, *args, **kwargs) -> None:
         super().__init__(session_id, *args, **kwargs)
-        self._session_key = f"{session_id}:counter"
-        self._messages_key = session_id
+        self._messages_key = f"user:{session_id}:messages"
+        self._session_key = f"user:{session_id}:counter"
+
+    async def _serialize_item(self, item) -> str:
+        """Override serialization to place 'role' or 'type' first for better Redis console scanning."""
+        ordered = {}
+        if "role" in item:
+            ordered["role"] = item["role"]
+        if "type" in item:
+            ordered["type"] = item["type"]
+        for k, v in item.items():
+            if k not in ordered:
+                ordered[k] = v
+        return await super()._serialize_item(ordered)
 
 from src.api.agent import ustaad_agent, UstaadAgentOutput
 from src.api.whatsapp import (
@@ -100,25 +87,32 @@ def _enqueue_task_to_gcp(body: dict) -> None:
     response = client.create_task(request={"parent": parent, "task": task})
     logger.info("Successfully enqueued task to Google Cloud Tasks: %s", response.name)
 
-# Async Upstash Redis client — conversation history stored directly via RedisSession
-_redis = _CompatibleRedis.from_env()
+def _get_redis_url() -> str:
+    url = os.getenv("UPSTASH_REDIS_URL")
+    if url:
+        return url
+    rest_url = os.getenv("UPSTASH_REDIS_REST_URL", "")
+    token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+    if rest_url and token:
+        host = rest_url.replace("https://", "").replace("http://", "")
+        return f"rediss://default:{token}@{host}:6379"
+    return "redis://localhost:6379"
+
+# Async Redis client — conversation history stored directly via RedisSession
+_redis = Redis.from_url(_get_redis_url(), decode_responses=True)
 CONV_TTL = 10800  # 3 hours
 
-# Simple in-memory deduplication set to prevent reprocessing duplicate webhook events
-_seen_message_ids: Set[str] = set()
-_MAX_SEEN = 10000
-
-
-def _already_processed(msg_id: str) -> bool:
-    """Returns True if we've already processed this message ID."""
-    if not msg_id:
+async def _already_processed(msg_id: str, sender: str) -> bool:
+    """Returns True if this message ID has already been seen in Redis."""
+    if not msg_id or not sender:
         return False
-    if msg_id in _seen_message_ids:
-        return True
-    if len(_seen_message_ids) >= _MAX_SEEN:
-        _seen_message_ids.clear()
-    _seen_message_ids.add(msg_id)
-    return False
+    try:
+        # nx=True ensures we only set it if it doesn't already exist
+        is_new = await _redis.set(f"user:{sender}:wamid:{msg_id}", "1", ex=86400, nx=True)
+        return is_new is None
+    except Exception as exc:
+        logger.warning("Redis deduplication check failed: %s", exc)
+        return False  # Fallback to allow processing on Redis errors
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +221,7 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
     if not sender:
         return
 
-    if _already_processed(msg_id):
+    if await _already_processed(msg_id, sender):
         logger.debug("Skipping duplicate WhatsApp message ID: %s", msg_id)
         return
 
@@ -248,7 +242,7 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
             btn_title = interactive.get("button_reply", {}).get("title", "")
             if btn_id.startswith("book_provider_"):
                 provider_id = btn_id.replace("book_provider_", "")
-                user_message = f"I want to book Provider ID: {provider_id}"
+                user_message = f"[BOOKING_SELECTION: provider_id={provider_id}]"
             else:
                 user_message = btn_title
 
@@ -258,7 +252,7 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
         btn_text = button.get("text", "")
         if btn_payload.startswith("book_provider_"):
             provider_id = btn_payload.replace("book_provider_", "")
-            user_message = f"I want to book Provider ID: {provider_id}"
+            user_message = f"[BOOKING_SELECTION: provider_id={provider_id}]"
         else:
             user_message = btn_payload or btn_text
 
