@@ -301,7 +301,17 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
         return
 
     # Dynamically inject customer phone number and message type into input
-    system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}]"
+    try:
+        lang = await _redis.get(f"user:{sender}:lang")
+    except Exception as e:
+        logger.warning("Failed to lookup language from Redis: %s", e)
+        lang = None
+
+    if lang:
+        system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}, Detected Language: {lang}]"
+    else:
+        system_info = f"[System Info: Customer Phone is {sender}, Message Type is {msg_type}]"
+
     user_message = f"{user_message}\n\n{system_info}"
 
     logger.info("WhatsApp incoming message from %s (%s): %s", sender_name, sender, user_message.replace("\n", " "))
@@ -326,6 +336,7 @@ async def _handle_message(msg: dict, contacts: dict) -> None:
         )
 
         agent_output = result.final_output
+
         if agent_output and hasattr(agent_output, "send_reply"):
             send_reply = agent_output.send_reply
             message_type = agent_output.message_type

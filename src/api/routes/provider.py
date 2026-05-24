@@ -143,6 +143,50 @@ _PROVIDER_MESSAGES = {
 
 APP_SECRET: str = os.environ["APP_SECRET"]
 
+async def _add_message_to_agent_memory(customer_phone: str, text: str) -> None:
+    """Helper to append an outbound WhatsApp message to the customer's agent session in Redis."""
+    import os
+    from redis.asyncio import Redis
+    from src.api.routes.webhook import UstaadRedisSession, CONV_TTL
+
+    # Instantiate a fresh Redis client for this call to avoid cross-event-loop issues in test runners
+    def _get_redis_url() -> str:
+        url = os.getenv("UPSTASH_REDIS_URL")
+        if url:
+            return url
+        rest_url = os.getenv("UPSTASH_REDIS_REST_URL", "")
+        token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+        if rest_url and token:
+            host = rest_url.replace("https://", "").replace("http://", "")
+            return f"rediss://default:{token}@{host}:6379"
+        return "redis://localhost:6379"
+
+    local_redis = None
+    try:
+        local_redis = Redis.from_url(_get_redis_url(), decode_responses=True)
+        session = UstaadRedisSession(
+            session_id=customer_phone,
+            redis_client=local_redis,
+            ttl=CONV_TTL,
+        )
+        await session.add_items([
+            {
+                "role": "assistant",
+                "type": "message",
+                "content": text
+            }
+        ])
+        logger.info("Successfully synced message to agent memory for %s", customer_phone)
+    except Exception as e:
+        logger.error("Failed to sync message to agent memory for %s: %s", customer_phone, e)
+    finally:
+        if local_redis is not None:
+            if hasattr(local_redis, "aclose"):
+                await local_redis.aclose()
+            elif hasattr(local_redis, "close"):
+                await local_redis.close()
+
+
 router = APIRouter(prefix="/api/provider", tags=["provider"])
 
 
@@ -300,6 +344,11 @@ async def accept_booking(
         footer_text=footer_text
     )
 
+    if whatsapp_sent:
+        pass  # kept for logs or debug
+
+    await _add_message_to_agent_memory(customer_phone, body_text)
+
     return BookingAcceptResponse(
         booking_id=booking_id,
         status=BookingStatus.accepted,
@@ -356,6 +405,11 @@ async def confirm_booking(
         booking_id=booking_id
     )
     whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
+
+    if whatsapp_sent:
+        pass
+
+    await _add_message_to_agent_memory(customer_phone, wa_message)
 
     return BookingStatusResponse(
         booking_id=booking_id,
@@ -424,6 +478,11 @@ async def advance_booking_status(
     wa_message = template.format(provider_name=provider_name)
     whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
 
+    if whatsapp_sent:
+        pass
+
+    await _add_message_to_agent_memory(customer_phone, wa_message)
+
     return BookingStatusResponse(
         booking_id=booking_id,
         status=body.status,
@@ -489,6 +548,11 @@ async def complete_booking(
     )
     whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
 
+    if whatsapp_sent:
+        pass
+
+    await _add_message_to_agent_memory(customer_phone, wa_message)
+
     return BookingCompleteResponse(
         booking_id=booking_id,
         status=BookingStatus.completed,
@@ -550,6 +614,7 @@ async def cancel_booking(
         cancel_template = _PROVIDER_MESSAGES[lang]["cancel"]
         wa_message = cancel_template.format(provider_name=provider_name)
         whatsapp_sent = await send_whatsapp_message(customer_phone, wa_message)
+        await _add_message_to_agent_memory(customer_phone, wa_message)
 
     return BookingStatusResponse(
         booking_id=booking_id,

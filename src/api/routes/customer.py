@@ -135,7 +135,17 @@ async def customer_chat(
         logger.info("GPS received: lat=%s, lng=%s, city_slug=%s", body.lat, body.lng, city_label)
 
     # Dynamically inject customer phone number and message type into input
-    system_info = f"[System Info: Customer Phone is {body.phone}, Message Type is api]"
+    try:
+        lang = await _redis.get(f"user:{body.phone}:lang")
+    except Exception as e:
+        logger.warning("Failed to lookup language from Redis: %s", e)
+        lang = None
+
+    if lang:
+        system_info = f"[System Info: Customer Phone is {body.phone}, Message Type is api, Detected Language: {lang}]"
+    else:
+        system_info = f"[System Info: Customer Phone is {body.phone}, Message Type is api]"
+
     user_message = f"{user_message}\n\n{system_info}"
 
     # Per-customer RedisSession — full history stored in Upstash, rolling 3-hour TTL
@@ -153,6 +163,7 @@ async def customer_chat(
     )
 
     reply = result.final_output or "Maafi chahta hoon, kuch masla aa gaya. Dobara try karein."
+
     return CustomerChatResponse(reply=reply, session_id=f"session:{body.phone}")
 
 
