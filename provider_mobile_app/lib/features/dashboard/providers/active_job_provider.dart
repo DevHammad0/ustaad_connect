@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../shared/models/service_booking.dart';
+import '../../../core/session/session_manager.dart';
 import '../services/job_service.dart';
 
 final jobServiceProvider = Provider<JobService>((ref) {
@@ -61,11 +63,35 @@ class ActiveJobNotifier extends StateNotifier<ActiveJobState> {
       final job = await _service.getActiveJob();
       if (mounted) {
         state = state.copyWith(job: job, clearJob: job == null, clearError: true);
+        if (job != null && job.apiStatus == 'en_route') {
+          _sendLocationUpdate();
+        }
       }
     } catch (e) {
       if (mounted) {
         state = state.copyWith(error: e.toString());
       }
+    }
+  }
+
+  Future<void> _sendLocationUpdate() async {
+    final providerId = SessionManager.instance.providerId;
+    if (providerId == null) return;
+
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+        await _service.updateLocation(providerId, pos.latitude, pos.longitude);
+      }
+    } catch (e) {
+      // Fail silently to prevent location error toast during polling
     }
   }
 

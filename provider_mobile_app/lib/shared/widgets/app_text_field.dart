@@ -12,6 +12,7 @@ class AppTextField extends StatefulWidget {
   final int maxLines;
   final String? Function(String?)? validator;
   final IconData? prefixIcon;
+  final ValueChanged<String>? onChanged;
 
   const AppTextField({
     super.key,
@@ -23,6 +24,7 @@ class AppTextField extends StatefulWidget {
     this.maxLines = 1,
     this.validator,
     this.prefixIcon,
+    this.onChanged,
   });
 
   @override
@@ -68,6 +70,7 @@ class _AppTextFieldState extends State<AppTextField> {
               obscureText: widget.obscureText,
               maxLines: widget.maxLines,
               validator: widget.validator,
+              onChanged: widget.onChanged,
               style: GoogleFonts.inter(
                 fontSize: 14,
                 color: AppColors.textPrimary,

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/profile_model.dart';
@@ -58,24 +61,7 @@ class ProfileHeader extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: profile.profilePhotoUrl.isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(
-                              profile.profilePhotoUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                Icons.person_rounded,
-                                size: 44,
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Icon(
-                            Icons.person_rounded,
-                            size: 44,
-                            color: Colors.white,
-                          ),
+                    child: _buildAvatarImage(profile),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -88,7 +74,7 @@ class ProfileHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    profile.phoneNumber,
+                    _formatPhone(profile.phoneNumber),
                     style: GoogleFonts.inter(
                       color: AppColors.textOnDarkMuted,
                       fontSize: 13,
@@ -183,4 +169,76 @@ class _Divider extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.15),
     );
   }
+}
+
+/// Format a raw phone like "923038571777" → "+92 303-8571777"
+String _formatPhone(String raw) {
+  final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.length >= 12 && digits.startsWith('92')) {
+    // 92 + 3 digits (network code) + 7 digits
+    final network = digits.substring(2, 5);
+    final number = digits.substring(5);
+    return '+92 $network-$number';
+  }
+  // Fallback: just show with + prefix
+  return '+$digits';
+}
+
+Widget _buildAvatarImage(ProviderProfileModel profile) {
+  // Prefer local path if set and file exists
+  final localPath = profile.profilePhotoLocalPath;
+  if (localPath.isNotEmpty) {
+    if (kIsWeb) {
+      return ClipOval(
+        child: Image.network(
+          localPath,
+          width: 86,
+          height: 86,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const Icon(Icons.person_rounded, size: 44, color: Colors.white),
+        ),
+      );
+    } else {
+      final file = File(localPath);
+      if (file.existsSync()) {
+        return ClipOval(
+          child: Image.file(
+            file,
+            width: 86,
+            height: 86,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.person_rounded, size: 44, color: Colors.white),
+          ),
+        );
+      }
+    }
+  }
+  if (profile.profilePhotoUrl.isNotEmpty) {
+    return ClipOval(
+      child: Image.network(
+        profile.profilePhotoUrl,
+        width: 86,
+        height: 86,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child; // fully loaded
+          return const Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white54,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.person_rounded, size: 44, color: Colors.white),
+      ),
+    );
+  }
+  return const Icon(Icons.person_rounded, size: 44, color: Colors.white);
 }

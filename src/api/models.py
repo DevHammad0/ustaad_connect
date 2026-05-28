@@ -95,6 +95,8 @@ class Provider(SQLModel, table=True):
     # Pakistani CNIC: "35202-1234567-1". Optional but recommended.
 
     profile_pic_url: str | None = Field(default=None, max_length=500)
+    cnic_front_url: str | None = Field(default=None, max_length=500)
+    cnic_back_url: str | None = Field(default=None, max_length=500)
     bio: str | None = Field(default=None, max_length=500)
 
     # ── Service & Location ────────────────────────────────────────────────
@@ -310,7 +312,9 @@ class ProviderDetail(ProviderCard):
     lat: float
     lng: float
     joined_at: datetime
-    # CNIC is intentionally excluded from all response schemas
+    cnic: str | None = None
+    cnic_front_url: str | None = None
+    cnic_back_url: str | None = None
 
 
 class BookingCreatedResponse(SQLModel):
@@ -341,6 +345,10 @@ class ActiveJobResponse(SQLModel):
     estimated_cost_min: int | None
     estimated_cost_max: int | None
     created_at: datetime
+    final_cost: int | None = None
+    customer_rating: int | None = None
+    customer_review: str | None = None
+    visit_fee: int | None = None
 
 
 class BookingAcceptResponse(SQLModel):
@@ -386,6 +394,15 @@ class ProviderRegisterRequest(SQLModel):
     bio: str | None = Field(default=None, max_length=500)
     cnic: str | None = Field(default=None, max_length=15)
     profile_pic_url: str | None = Field(default=None, max_length=500)
+    cnic_front_url: str | None = Field(default=None, max_length=500)
+    cnic_back_url: str | None = Field(default=None, max_length=500)
+
+    @field_validator("cnic", mode="before")
+    @classmethod
+    def empty_cnic_to_none(cls, v: str | None) -> str | None:
+        if v is not None and v.strip() == "":
+            return None
+        return v
 
 
 class ProviderLoginRequest(SQLModel):
@@ -408,4 +425,14 @@ class ProviderProfileUpdateRequest(SQLModel):
     area: str | None = None
     cnic: str | None = Field(default=None, max_length=15)
     years_experience: int | None = Field(default=None, ge=0, le=50)
+    profile_pic_url: str | None = Field(default=None, max_length=500)
+    cnic_front_url: str | None = Field(default=None, max_length=500)
+    cnic_back_url: str | None = Field(default=None, max_length=500)
+
+    @field_validator("cnic", mode="before")
+    @classmethod
+    def empty_cnic_to_none(cls, v: str | None) -> str | None:
+        if v is not None and v.strip() == "":
+            return None
+        return v
 

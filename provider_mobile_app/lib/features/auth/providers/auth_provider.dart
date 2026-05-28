@@ -51,6 +51,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required double visitFee,
     required double lat,
     required double lng,
+    String cnic = '',
   }) async {
     state = AuthLoading();
     try {
@@ -62,6 +63,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         visitFee: visitFee,
         lat: lat,
         lng: lng,
+        cnic: cnic,
       );
       state = AuthAuthenticated(user);
     } catch (e) {

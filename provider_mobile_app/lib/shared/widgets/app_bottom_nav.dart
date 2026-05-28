@@ -43,6 +43,14 @@ class AppBottomNav extends StatelessWidget {
               _NavItem(
                 index: 1,
                 currentIndex: currentIndex,
+                icon: Icons.history_rounded,
+                activeIcon: Icons.history_rounded,
+                label: 'History',
+                onTap: onTap,
+              ),
+              _NavItem(
+                index: 2,
+                currentIndex: currentIndex,
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: 'Profile',

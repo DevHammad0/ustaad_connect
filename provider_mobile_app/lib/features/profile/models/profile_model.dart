@@ -3,10 +3,14 @@ class ProviderProfileModel {
   final String fullName;
   final String phoneNumber;
   final String profilePhotoUrl;
+  final String profilePhotoLocalPath; // locally picked image, not yet synced
   final double rating;
   final String bio;
   final int experienceYears;
   final String cnic;
+  final bool isVerified;
+  final String cnicFrontUrl;
+  final String cnicBackUrl;
 
   // Service Settings
   final String serviceCategory;
@@ -30,10 +34,14 @@ class ProviderProfileModel {
     required this.fullName,
     required this.phoneNumber,
     this.profilePhotoUrl = '',
+    this.profilePhotoLocalPath = '',
     this.rating = 0.0,
     required this.bio,
     required this.experienceYears,
     this.cnic = '',
+    this.isVerified = false,
+    this.cnicFrontUrl = '',
+    this.cnicBackUrl = '',
     required this.serviceCategory,
     required this.visitFee,
     required this.serviceAreas,
@@ -50,9 +58,14 @@ class ProviderProfileModel {
   ProviderProfileModel copyWith({
     String? fullName,
     String? phoneNumber,
+    String? profilePhotoUrl,
+    String? profilePhotoLocalPath,
     String? bio,
     int? experienceYears,
     String? cnic,
+    bool? isVerified,
+    String? cnicFrontUrl,
+    String? cnicBackUrl,
     String? serviceCategory,
     double? visitFee,
     List<String>? serviceAreas,
@@ -69,11 +82,15 @@ class ProviderProfileModel {
       id: id,
       fullName: fullName ?? this.fullName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
-      profilePhotoUrl: profilePhotoUrl,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
+      profilePhotoLocalPath: profilePhotoLocalPath ?? this.profilePhotoLocalPath,
       rating: rating,
       bio: bio ?? this.bio,
       experienceYears: experienceYears ?? this.experienceYears,
       cnic: cnic ?? this.cnic,
+      isVerified: isVerified ?? this.isVerified,
+      cnicFrontUrl: cnicFrontUrl ?? this.cnicFrontUrl,
+      cnicBackUrl: cnicBackUrl ?? this.cnicBackUrl,
       serviceCategory: serviceCategory ?? this.serviceCategory,
       visitFee: visitFee ?? this.visitFee,
       serviceAreas: serviceAreas ?? this.serviceAreas,

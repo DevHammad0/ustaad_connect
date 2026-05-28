@@ -272,6 +272,10 @@ async def get_active_job(
         estimated_cost_min=booking.estimated_cost_min,
         estimated_cost_max=booking.estimated_cost_max,
         created_at=booking.created_at,
+        final_cost=booking.final_cost,
+        customer_rating=booking.customer_rating,
+        customer_review=booking.customer_review,
+        visit_fee=booking.provider.visit_fee if booking.provider else None,
     )
 
 
@@ -692,6 +696,8 @@ async def register_provider(
         bio=body.bio,
         cnic=body.cnic,
         profile_pic_url=body.profile_pic_url,
+        cnic_front_url=body.cnic_front_url,
+        cnic_back_url=body.cnic_back_url,
         is_active=True,
         is_verified=False,
     )
@@ -720,6 +726,9 @@ async def register_provider(
         lat=provider.lat,
         lng=provider.lng,
         joined_at=provider.joined_at,
+        cnic=provider.cnic,
+        cnic_front_url=provider.cnic_front_url,
+        cnic_back_url=provider.cnic_back_url,
     )
 
 
@@ -769,6 +778,9 @@ async def login_provider(
         lat=provider.lat,
         lng=provider.lng,
         joined_at=provider.joined_at,
+        cnic=provider.cnic,
+        cnic_front_url=provider.cnic_front_url,
+        cnic_back_url=provider.cnic_back_url,
     )
 
 
@@ -818,6 +830,9 @@ async def get_provider_profile(
         lat=provider.lat,
         lng=provider.lng,
         joined_at=provider.joined_at,
+        cnic=provider.cnic,
+        cnic_front_url=provider.cnic_front_url,
+        cnic_back_url=provider.cnic_back_url,
     )
 
 
@@ -868,6 +883,12 @@ async def update_provider_profile(
         provider.cnic = body.cnic
     if body.years_experience is not None:
         provider.years_experience = body.years_experience
+    if body.profile_pic_url is not None:
+        provider.profile_pic_url = body.profile_pic_url
+    if body.cnic_front_url is not None:
+        provider.cnic_front_url = body.cnic_front_url
+    if body.cnic_back_url is not None:
+        provider.cnic_back_url = body.cnic_back_url
 
     session.add(provider)
     await session.commit()
@@ -893,6 +914,9 @@ async def update_provider_profile(
         lat=provider.lat,
         lng=provider.lng,
         joined_at=provider.joined_at,
+        cnic=provider.cnic,
+        cnic_front_url=provider.cnic_front_url,
+        cnic_back_url=provider.cnic_back_url,
     )
 
 
@@ -983,6 +1007,10 @@ async def get_provider_bookings_history(
                 estimated_cost_min=b_rel.estimated_cost_min,
                 estimated_cost_max=b_rel.estimated_cost_max,
                 created_at=b_rel.created_at,
+                final_cost=b_rel.final_cost,
+                customer_rating=b_rel.customer_rating,
+                customer_review=b_rel.customer_review,
+                visit_fee=b_rel.provider.visit_fee if b_rel.provider else None,
             )
         )
 

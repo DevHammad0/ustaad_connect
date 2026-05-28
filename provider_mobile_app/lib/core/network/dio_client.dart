@@ -23,16 +23,19 @@ class DioClient {
           // Inject the required X-App-Secret header for all requests
           options.headers[ApiEndpoints.appSecretHeader] = ApiEndpoints.appSecret;
 
-          // Add Content-Type only for requests with a body (POST, PUT, PATCH)
-          if (options.method == 'POST' || options.method == 'PUT' || options.method == 'PATCH') {
+          // Add Content-Type only for JSON requests (not multipart/form-data)
+          if ((options.method == 'POST' || options.method == 'PUT' || options.method == 'PATCH')
+              && options.data is! FormData) {
             options.headers['Content-Type'] = 'application/json';
           }
 
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
-          // TODO: Handle 401 Unauthorized (token refresh logic or logout)
-          // if (error.response?.statusCode == 401) { ... }
+          if (error.response?.statusCode == 401) {
+            await SessionManager.instance.clearSession();
+            SessionManager.onSessionExpired?.call();
+          }
           return handler.next(error);
         },
       ),

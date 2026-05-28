@@ -19,10 +19,12 @@ class AuthService {
     String? providerId;
     String? name;
     String? token;
+    bool isVerified = false;
     if (data is Map) {
       providerId = (data['id'] ?? data['provider_id'])?.toString();
       name = data['name']?.toString();
       token = (data['token'] ?? data['access_token'] ?? data['jwt'])?.toString();
+      isVerified = data['is_verified'] == true;
     }
     if (providerId == null) {
       throw Exception('Login succeeded but provider ID was not returned.');
@@ -33,6 +35,7 @@ class AuthService {
       phone: fullPhone,
       name: name,
       isProfileComplete: true,
+      isVerified: isVerified,
     );
   }
 
@@ -63,15 +66,17 @@ class AuthService {
         'lat': lat,
         'lng': lng,
         'bio': bio,
-        'cnic': cnic,
+        'cnic': cnic.trim().isEmpty ? null : cnic.trim(),
       },
     );
     final data = response.data;
     String? providerId;
     String? token;
+    bool isVerified = false;
     if (data is Map) {
       providerId = (data['id'] ?? data['provider_id'])?.toString();
       token = (data['token'] ?? data['access_token'] ?? data['jwt'])?.toString();
+      isVerified = data['is_verified'] == true;
     }
     if (providerId == null) {
       throw Exception('Registration succeeded but provider ID was not returned.');
@@ -82,6 +87,7 @@ class AuthService {
       phone: fullPhone,
       name: name,
       isProfileComplete: true,
+      isVerified: isVerified,
     );
   }
 
@@ -107,11 +113,13 @@ class AuthService {
       );
       final data = response.data as Map<String, dynamic>;
       final name = data['name'] as String?;
+      final isVerified = data['is_verified'] == true;
       return AuthUser(
         id: providerId,
         phone: phone,
         name: name,
         isProfileComplete: name != null && name.isNotEmpty,
+        isVerified: isVerified,
       );
     } catch (e) {
       // If the API call fails or user is not found, treat as an unregistered provider
@@ -120,6 +128,7 @@ class AuthService {
         phone: phone,
         name: null,
         isProfileComplete: false,
+        isVerified: false,
       );
     }
   }

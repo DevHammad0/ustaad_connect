@@ -34,7 +34,7 @@ class ProfileService {
         'is_active': updatedProfile.isAvailable,
         'visit_fee': updatedProfile.visitFee.toInt(),
         'bio': updatedProfile.bio,
-        'cnic': updatedProfile.cnic,
+        'cnic': updatedProfile.cnic.trim().isEmpty ? null : updatedProfile.cnic.trim(),
         'service_type': _toApiServiceType(updatedProfile.serviceCategory),
         'city': updatedProfile.serviceAreas.isNotEmpty
             ? updatedProfile.serviceAreas.first.toLowerCase()
@@ -42,6 +42,12 @@ class ProfileService {
         'area': updatedProfile.serviceAreas.length > 1
             ? updatedProfile.serviceAreas[1]
             : '',
+        if (updatedProfile.profilePhotoUrl.isNotEmpty)
+          'profile_pic_url': updatedProfile.profilePhotoUrl,
+        if (updatedProfile.cnicFrontUrl.isNotEmpty)
+          'cnic_front_url': updatedProfile.cnicFrontUrl,
+        if (updatedProfile.cnicBackUrl.isNotEmpty)
+          'cnic_back_url': updatedProfile.cnicBackUrl,
       },
     );
     return true;
@@ -62,7 +68,7 @@ class ProfileService {
       final ratingCount = data['rating_count'] ?? 0;
 
       if (ratingCount is num && ratingCount > 0 && data['rating_total'] != null) {
-        rating = (ratingTotal as num).toDouble() / (ratingCount as num).toDouble();
+        rating = (ratingTotal as num).toDouble() / ratingCount.toDouble();
       } else {
         final rawRating = data['rating'] ?? data['avg_rating'] ?? 0;
         if (rawRating is num) {
@@ -83,6 +89,9 @@ class ProfileService {
       bio: data['bio'] ?? '',
       experienceYears: data['years_experience'] ?? 0,
       cnic: data['cnic'] ?? '',
+      isVerified: data['is_verified'] ?? false,
+      cnicFrontUrl: data['cnic_front_url'] ?? '',
+      cnicBackUrl: data['cnic_back_url'] ?? '',
       serviceCategory: _fromApiServiceType(data['service_type'] ?? ''),
       visitFee: (data['visit_fee'] ?? 0).toDouble(),
       serviceAreas: _parseAreas(data),

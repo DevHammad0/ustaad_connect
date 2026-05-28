@@ -66,7 +66,11 @@ class _OtpVerificationScreenState
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next is AuthAuthenticated) {
         if (next.user.isProfileComplete) {
-          context.go('/dashboard');
+          if (next.user.isVerified) {
+            context.go('/dashboard');
+          } else {
+            context.go('/verification');
+          }
         } else {
           context.go('/account-setup');
         }

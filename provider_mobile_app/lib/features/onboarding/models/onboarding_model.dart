@@ -7,6 +7,8 @@ class ProviderProfileDraft {
   final int experienceYears;
   final String shortBio;
   final String cnic;
+  final String? cnicFrontUrl;
+  final String? cnicBackUrl;
   final List<String> workingDays;
   final String startTime;
   final String endTime;
@@ -21,6 +23,8 @@ class ProviderProfileDraft {
     this.experienceYears = 0,
     this.shortBio = '',
     this.cnic = '',
+    this.cnicFrontUrl,
+    this.cnicBackUrl,
     this.workingDays = const [],
     this.startTime = '09:00 AM',
     this.endTime = '05:00 PM',
@@ -36,6 +40,8 @@ class ProviderProfileDraft {
     int? experienceYears,
     String? shortBio,
     String? cnic,
+    String? cnicFrontUrl,
+    String? cnicBackUrl,
     List<String>? workingDays,
     String? startTime,
     String? endTime,
@@ -50,6 +56,8 @@ class ProviderProfileDraft {
       experienceYears: experienceYears ?? this.experienceYears,
       shortBio: shortBio ?? this.shortBio,
       cnic: cnic ?? this.cnic,
+      cnicFrontUrl: cnicFrontUrl ?? this.cnicFrontUrl,
+      cnicBackUrl: cnicBackUrl ?? this.cnicBackUrl,
       workingDays: workingDays ?? this.workingDays,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
@@ -57,7 +65,12 @@ class ProviderProfileDraft {
     );
   }
 
-  bool get isPersonalInfoValid => fullName.trim().isNotEmpty;
+  bool get isPersonalInfoValid =>
+      fullName.trim().isNotEmpty &&
+      cnic.trim().isNotEmpty &&
+      profilePhotoUrl != null &&
+      cnicFrontUrl != null &&
+      cnicBackUrl != null;
   bool get isServiceCategoryValid => serviceCategory.isNotEmpty;
   bool get isServiceAreaValid => serviceAreas.isNotEmpty;
   bool get isVisitFeeValid => visitFee > 0;

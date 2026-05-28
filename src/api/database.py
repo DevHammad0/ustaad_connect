@@ -112,7 +112,7 @@ async def seed_providers_if_empty() -> None:
                 lng=data["lng"],
                 years_experience=data["years_experience"],
                 is_active=True,
-                is_verified=False,
+                is_verified=True,
                 rating_total=0.0,
                 rating_count=0,
                 total_jobs_done=0,
@@ -182,6 +182,7 @@ async def fetch_available_providers(
             )) AS distance_km
         FROM providers p
         WHERE p.is_active = TRUE
+          AND p.is_verified = TRUE
           AND p.service_type = :service_type
           AND p.id NOT IN (
               SELECT provider_id FROM bookings

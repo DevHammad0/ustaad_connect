@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
 
-class AppLocationMap extends StatelessWidget {
+class AppLocationMap extends StatefulWidget {
   final LatLng center;
   final LatLng marker;
   final double zoom;
@@ -22,18 +22,46 @@ class AppLocationMap extends StatelessWidget {
   });
 
   @override
+  State<AppLocationMap> createState() => _AppLocationMapState();
+}
+
+class _AppLocationMapState extends State<AppLocationMap> {
+  late final MapController _mapController;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+  }
+
+  @override
+  void didUpdateWidget(covariant AppLocationMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.center.latitude != oldWidget.center.latitude ||
+        widget.center.longitude != oldWidget.center.longitude) {
+      // Use post-frame callback to ensure the map controller is ready
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _mapController.move(widget.center, widget.zoom);
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: SizedBox(
-        height: height,
+        height: widget.height,
         child: Stack(
           children: [
             FlutterMap(
+              mapController: _mapController,
               options: MapOptions(
-                initialCenter: center,
-                initialZoom: zoom,
-                onTap: onTap == null ? null : (_, point) => onTap!(point),
+                initialCenter: widget.center,
+                initialZoom: widget.zoom,
+                onTap: widget.onTap == null ? null : (_, point) => widget.onTap!(point),
               ),
               children: [
                 TileLayer(
@@ -43,7 +71,7 @@ class AppLocationMap extends StatelessWidget {
                 MarkerLayer(
                   markers: [
                     Marker(
-                      point: marker,
+                      point: widget.marker,
                       width: 54,
                       height: 54,
                       child: const _PinMarker(),
@@ -52,7 +80,7 @@ class AppLocationMap extends StatelessWidget {
                 ),
               ],
             ),
-            if (label != null)
+            if (widget.label != null)
               Positioned(
                 top: 12,
                 left: 12,
@@ -67,7 +95,7 @@ class AppLocationMap extends StatelessWidget {
                       vertical: 8,
                     ),
                     child: Text(
-                      label!,
+                      widget.label!,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,

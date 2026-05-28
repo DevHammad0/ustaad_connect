@@ -23,6 +23,7 @@ import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_verification_screen.dart';
 import '../../features/auth/screens/account_setup_screen.dart';
+import '../../features/auth/screens/verification_screen.dart';
 
 import '../../features/onboarding/screens/onboarding_flow_screen.dart';
 import '../../features/onboarding/screens/steps/personal_info_step.dart';
@@ -67,6 +68,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/account-setup',
       builder: (context, state) => const AccountSetupScreen(),
+    ),
+    GoRoute(
+      path: '/verification',
+      builder: (context, state) => const VerificationScreen(),
     ),
 
     // Onboarding Shell Route (Wizard)

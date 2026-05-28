@@ -58,6 +58,14 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 SettingsTile(
+                  icon: Icons.history_rounded,
+                  title: 'Booking History',
+                  subtitle: 'View your completed and cancelled jobs',
+                  onTap: () => context.push('/history'),
+                  iconColor: AppColors.primary,
+                ),
+                const SizedBox(height: 8),
+                SettingsTile(
                   icon: Icons.access_time_rounded,
                   title: 'Availability & Schedule',
                   subtitle: profile.isAvailable

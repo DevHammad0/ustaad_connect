@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/session/session_manager.dart';
+import '../../profile/services/profile_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -41,9 +42,22 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToNext() async {
     await Future.delayed(const Duration(seconds: 2, milliseconds: 500));
     if (mounted) {
-      context.go(
-        SessionManager.instance.isLoggedIn ? '/dashboard' : '/login',
-      );
+      if (SessionManager.instance.isLoggedIn) {
+        try {
+          final profile = await ProfileService().getProfile();
+          if (mounted) {
+            if (profile.isVerified) {
+              context.go('/dashboard');
+            } else {
+              context.go('/verification');
+            }
+          }
+        } catch (e) {
+          if (mounted) context.go('/login');
+        }
+      } else {
+        context.go('/login');
+      }
     }
   }
 

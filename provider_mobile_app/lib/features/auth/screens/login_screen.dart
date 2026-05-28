@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/constants/dummy_data.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/phone_input.dart';
 import '../../../shared/widgets/app_primary_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_location_map.dart';
@@ -30,6 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       TextEditingController(text: '34.00');
   final TextEditingController _lngController =
       TextEditingController(text: '71.50');
+  final TextEditingController _cnicController = TextEditingController();
   late AnimationController _animController;
   late Animation<Offset> _slideAnim;
   late Animation<double> _fadeAnim;
@@ -61,6 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _feeController.dispose();
     _latController.dispose();
     _lngController.dispose();
+    _cnicController.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -83,8 +86,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final visitFee = double.tryParse(_feeController.text.trim()) ?? 0;
     final lat = double.tryParse(_latController.text.trim()) ?? 0;
     final lng = double.tryParse(_lngController.text.trim()) ?? 0;
+    final cnic = _cnicController.text.trim();
 
-    if (name.isEmpty || phone.isEmpty || city.isEmpty) {
+    if (name.isEmpty || phone.isEmpty || city.isEmpty || cnic.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields')),
       );
@@ -105,6 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           visitFee: visitFee,
           lat: lat,
           lng: lng,
+          cnic: cnic,
         );
   }
 
@@ -127,7 +132,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         throw Exception('Location permission was not granted.');
       }
 
-      final position = await Geolocator.getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+        ),
+      );
       _updateCoordinates(position.latitude, position.longitude);
     } catch (e) {
       if (mounted) {
@@ -163,7 +172,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next is AuthAuthenticated) {
-        context.go('/dashboard');
+        if (next.user.isVerified) {
+          context.go('/dashboard');
+        } else {
+          context.go('/verification');
+        }
       } else if (next is AuthCodeSent) {
         context.push('/verify-otp', extra: next.phone);
       } else if (next is AuthError) {
@@ -306,12 +319,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ],
                             _FieldLabel('Phone Number'),
                             const SizedBox(height: 8),
-                            _AppTextField(
+                            PhoneInput(
                               controller: _phoneController,
-                              hintText: '923001234567',
-                              keyboardType: TextInputType.phone,
+                              hintText: '3001234567',
                             ),
                             if (_showRegister) ...[
+                              const SizedBox(height: 16),
+                              _FieldLabel('CNIC Number'),
+                              const SizedBox(height: 8),
+                              _AppTextField(
+                                controller: _cnicController,
+                                hintText: 'e.g. 35202-1234567-1',
+                                keyboardType: TextInputType.phone,
+                              ),
                               const SizedBox(height: 16),
                               _FieldLabel('Service Type'),
                               const SizedBox(height: 8),
@@ -348,36 +368,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 controller: _feeController,
                                 hintText: '500',
                                 keyboardType: TextInputType.number,
-                              ),
-                              const SizedBox(height: 16),
-                              _FieldLabel('Latitude & Longitude'),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _AppTextField(
-                                      controller: _latController,
-                                      hintText: '34.00',
-                                      keyboardType:
-                                          const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: _AppTextField(
-                                      controller: _lngController,
-                                      hintText: '71.50',
-                                      keyboardType:
-                                          const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                ],
                               ),
                               const SizedBox(height: 16),
                               SizedBox(
@@ -509,13 +499,11 @@ class _AppTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final TextInputType? keyboardType;
-  final ValueChanged<String>? onChanged;
 
   const _AppTextField({
     required this.controller,
     required this.hintText,
     this.keyboardType,
-    this.onChanged,
   });
 
   @override
@@ -523,7 +511,6 @@ class _AppTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      onChanged: onChanged,
       decoration: _inputDecoration().copyWith(hintText: hintText),
     );
   }

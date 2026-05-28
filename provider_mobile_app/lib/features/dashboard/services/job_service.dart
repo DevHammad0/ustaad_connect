@@ -85,6 +85,13 @@ class JobService {
     );
   }
 
+  Future<void> updateLocation(String providerId, double lat, double lng) async {
+    await _client.post(
+      ApiEndpoints.updateLocation(providerId),
+      data: {'lat': lat, 'lng': lng},
+    );
+  }
+
   BookingStatus _parseStatus(dynamic raw) {
     switch (raw?.toString()) {
       case 'accepted':

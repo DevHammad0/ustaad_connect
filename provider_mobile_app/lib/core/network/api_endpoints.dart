@@ -1,13 +1,37 @@
+import 'package:flutter/foundation.dart';
+
 class ApiEndpoints {
   // Base URL — replace with real server URL when deployed
   // From Postman collection: http://localhost:8001 (dev)
-  static const String baseUrl =
-      'https://ustaad-connect-941693721026.us-central1.run.app';
+  static String get baseUrl {
+    const envUrl = String.fromEnvironment('BACKEND_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
+
+    if (kDebugMode) {
+      // Standard local development port. Change to 8001 if your local server runs on port 8001.
+      const localPort = '8000';
+      if (kIsWeb) {
+        return 'http://localhost:$localPort';
+      }
+      return defaultTargetPlatform == TargetPlatform.android
+          ? 'http://10.0.2.2:$localPort'
+          : 'http://localhost:$localPort';
+    }
+    return 'https://ustaad-connect-941693721026.us-central1.run.app';
+  }
 
   // Required header for all requests (from Postman: X-App-Secret)
   static const String appSecretHeader = 'X-App-Secret';
-  static const String appSecret =
-      '97361b6101404313c275dd4c6192f825f4de065f5f1e2a3a11b9b13a80ed2e86';
+  
+  static String get appSecret {
+    const envSecret = String.fromEnvironment('APP_SECRET');
+    if (envSecret.isNotEmpty) {
+      return envSecret;
+    }
+    return '97361b6101404313c275dd4c6192f825f4de065f5f1e2a3a11b9b13a80ed2e86';
+  }
 
   // Auth
   // POST /api/provider/login         { phone }

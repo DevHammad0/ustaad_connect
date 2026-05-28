@@ -1,3 +1,7 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/session/session_manager.dart';
@@ -12,10 +16,29 @@ class OnboardingService {
   Future<bool> saveProviderProfile(
     ProviderProfileDraft profile, {
     required String phone,
-    // Default coordinates for Islamabad — update when GPS is integrated
     double lat = 33.6844,
     double lng = 73.0479,
   }) async {
+    double finalLat = lat;
+    double finalLng = lng;
+
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+        finalLat = pos.latitude;
+        finalLng = pos.longitude;
+      }
+    } catch (e) {
+      // Fallback to default lat/lng on permission or timeout issues
+    }
+
     final body = {
       'name': profile.fullName,
       'phone': phone,
@@ -27,9 +50,11 @@ class OnboardingService {
       'visit_fee': profile.visitFee.toInt(),
       'years_experience': profile.experienceYears,
       'bio': profile.shortBio,
-      'cnic': profile.cnic,
-      'lat': lat,
-      'lng': lng,
+      'cnic': profile.cnic.trim().isEmpty ? null : profile.cnic.trim(),
+      'cnic_front_url': profile.cnicFrontUrl,
+      'cnic_back_url': profile.cnicBackUrl,
+      'lat': finalLat,
+      'lng': finalLng,
     };
 
     final response = await _client.post(ApiEndpoints.register, data: body);
@@ -78,7 +103,6 @@ class OnboardingService {
     return map[category] ?? category.toLowerCase().replaceAll(' ', '_');
   }
 
-  // Converts API service type → display name
   String _fromApiServiceType(String apiType) {
     const map = {
       'ac_repair': 'AC Repair',
@@ -90,5 +114,29 @@ class OnboardingService {
       'painter': 'Painter',
     };
     return map[apiType] ?? apiType;
+  }
+
+  Future<String> uploadImage(XFile file) async {
+    final MultipartFile multipartFile;
+    if (kIsWeb) {
+      final bytes = await file.readAsBytes();
+      multipartFile = MultipartFile.fromBytes(
+        bytes,
+        filename: 'upload.jpg',
+        contentType: DioMediaType('image', 'jpeg'),
+      );
+    } else {
+      multipartFile = await MultipartFile.fromFile(
+        file.path,
+        filename: 'upload.jpg',
+        contentType: DioMediaType('image', 'jpeg'),
+      );
+    }
+
+    final formData = FormData.fromMap({
+      'file': multipartFile,
+    });
+    final response = await _client.post('/api/upload', data: formData);
+    return response.data['url'] as String;
   }
 }
